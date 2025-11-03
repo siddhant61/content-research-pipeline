@@ -8,7 +8,7 @@ from typing import Dict, Optional
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Security, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -46,6 +46,11 @@ app = FastAPI(
 reports_dir = Path("reports")
 reports_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/reports", StaticFiles(directory=str(reports_dir)), name="reports")
+
+# Configure static file serving for UI
+ui_dir = Path("ui")
+if ui_dir.exists():
+    app.mount("/ui", StaticFiles(directory=str(ui_dir), html=True), name="ui")
 
 # API Key security
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -87,6 +92,10 @@ class ResearchRequest(BaseModel):
     include_videos: bool = Field(True, description="Whether to include video search")
     include_news: bool = Field(True, description="Whether to include news search")
     max_results: Optional[int] = Field(None, description="Maximum number of search results")
+    # Optional API keys to override server environment variables
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API key (overrides server key)")
+    google_api_key: Optional[str] = Field(None, description="Google API key (overrides server key)")
+    google_cse_id: Optional[str] = Field(None, description="Google CSE ID (overrides server ID)")
 
 
 class JobResponse(BaseModel):
@@ -133,7 +142,10 @@ async def run_research_pipeline(job_id: str, request: ResearchRequest):
             include_videos=request.include_videos,
             include_news=request.include_news,
             max_results=request.max_results or settings.max_search_results,
-            job_id=job_id
+            job_id=job_id,
+            openai_api_key=request.openai_api_key,
+            google_api_key=request.google_api_key,
+            google_cse_id=request.google_cse_id
         )
         
         # Update job with result
@@ -166,9 +178,24 @@ async def run_research_pipeline(job_id: str, request: ResearchRequest):
             jobs[job_id]["error"] = str(e)
 
 
-@app.get("/", tags=["health"])
+@app.get("/", include_in_schema=False)
 async def root():
-    """Root endpoint - API information."""
+    """Root endpoint - serve UI or redirect."""
+    ui_index = Path("ui/index.html")
+    if ui_index.exists():
+        return FileResponse(ui_index)
+    else:
+        # Fallback to API information if UI not found
+        return {
+            "name": "Content Research Pipeline API",
+            "version": "1.0.0",
+            "status": "running"
+        }
+
+
+@app.get("/api", tags=["health"])
+async def api_info():
+    """API information endpoint."""
     return {
         "name": "Content Research Pipeline API",
         "version": "1.0.0",

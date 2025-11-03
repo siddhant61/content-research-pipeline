@@ -41,6 +41,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY setup.py .
 COPY README.md .
 COPY src/ ./src/
+COPY ui/ ./ui/
 
 # Install the application in development mode
 RUN pip install --no-cache-dir -e .

@@ -48,7 +48,8 @@ class AnalysisProcessor:
     async def analyze(
         self,
         query: str,
-        scraped_contents: List[ScrapedContent]
+        scraped_contents: List[ScrapedContent],
+        openai_api_key: Optional[str] = None
     ) -> AnalysisResult:
         """
         Perform comprehensive analysis on scraped content.
@@ -56,11 +57,20 @@ class AnalysisProcessor:
         Args:
             query: Original search query
             scraped_contents: List of scraped content to analyze
+            openai_api_key: Optional OpenAI API key to override settings
             
         Returns:
             AnalysisResult with all analysis data
         """
         logger.info(f"Starting analysis for query: {query}")
+        
+        # Use custom LLM service if API key is provided, otherwise use global instance
+        from ..services.llm import LLMService
+        if openai_api_key:
+            custom_llm_service = LLMService(openai_api_key=openai_api_key)
+            service = custom_llm_service
+        else:
+            service = llm_service
         
         try:
             # Combine all text content
@@ -72,22 +82,22 @@ class AnalysisProcessor:
             
             # Run analyses in parallel
             summary_task = asyncio.create_task(
-                llm_service.generate_summary(combined_text)
+                service.generate_summary(combined_text)
             )
             entities_task = asyncio.create_task(
-                self._extract_entities(combined_text)
+                self._extract_entities(combined_text, service)
             )
             sentiment_task = asyncio.create_task(
-                self._analyze_sentiment(combined_text)
+                self._analyze_sentiment(combined_text, service)
             )
             topics_task = asyncio.create_task(
-                self._extract_topics(combined_text)
+                self._extract_topics(combined_text, service)
             )
             timeline_task = asyncio.create_task(
                 self._extract_timeline(combined_text, scraped_contents)
             )
             queries_task = asyncio.create_task(
-                self._generate_related_queries(combined_text, scraped_contents)
+                self._generate_related_queries(combined_text, scraped_contents, service)
             )
             
             # Wait for all analyses to complete
@@ -168,12 +178,13 @@ class AnalysisProcessor:
         
         return combined
     
-    async def _extract_entities(self, text: str) -> List[Entity]:
+    async def _extract_entities(self, text: str, service) -> List[Entity]:
         """
         Extract entities using both spaCy and LLM.
         
         Args:
             text: Text to extract entities from
+            service: LLM service instance to use
             
         Returns:
             List of Entity objects
@@ -181,7 +192,7 @@ class AnalysisProcessor:
         entities_dict = {}
         
         # Extract using LLM
-        llm_entities = await llm_service.extract_entities(text)
+        llm_entities = await service.extract_entities(text)
         for ent in llm_entities:
             key = (ent['text'].lower(), ent['label'])
             if key not in entities_dict:
@@ -219,18 +230,19 @@ class AnalysisProcessor:
         # Return unique entities
         return list(entities_dict.values())
     
-    async def _analyze_sentiment(self, text: str) -> dict:
+    async def _analyze_sentiment(self, text: str, service) -> dict:
         """
         Analyze sentiment using TextBlob and LLM.
         
         Args:
             text: Text to analyze
+            service: LLM service instance to use
             
         Returns:
             Dictionary with sentiment metrics
         """
         # Use LLM for sentiment analysis
-        llm_sentiment = await llm_service.analyze_sentiment(text)
+        llm_sentiment = await service.analyze_sentiment(text)
         
         # Try TextBlob as well
         try:
@@ -250,17 +262,18 @@ class AnalysisProcessor:
         
         return sentiment
     
-    async def _extract_topics(self, text: str) -> List[Topic]:
+    async def _extract_topics(self, text: str, service) -> List[Topic]:
         """
         Extract topics using LLM.
         
         Args:
             text: Text to extract topics from
+            service: LLM service instance to use
             
         Returns:
             List of Topic objects
         """
-        llm_topics = await llm_service.extract_topics(
+        llm_topics = await service.extract_topics(
             text,
             num_topics=settings.max_topics
         )
@@ -334,7 +347,8 @@ class AnalysisProcessor:
     async def _generate_related_queries(
         self,
         text: str,
-        scraped_contents: List[ScrapedContent]
+        scraped_contents: List[ScrapedContent],
+        service
     ) -> List[RelatedQuery]:
         """
         Generate related queries using LLM.
@@ -342,11 +356,12 @@ class AnalysisProcessor:
         Args:
             text: Text to base queries on
             scraped_contents: Original scraped contents
+            service: LLM service instance to use
             
         Returns:
             List of RelatedQuery objects
         """
-        query_strings = await llm_service.generate_queries(text, num_queries=5)
+        query_strings = await service.generate_queries(text, num_queries=5)
         
         related_queries = []
         for query_str in query_strings:
@@ -431,21 +446,30 @@ class AnalysisProcessor:
             analyzed_at=datetime.now()
         )
     
-    async def calculate_credibility(self, state: PipelineState) -> None:
+    async def calculate_credibility(self, state: PipelineState, openai_api_key: Optional[str] = None) -> None:
         """
         Calculate and populate credibility scores for search results.
         
         Args:
             state: Pipeline state containing search results to assess
+            openai_api_key: Optional OpenAI API key to override settings
         """
         logger.info(f"Calculating credibility for {len(state.search_results)} search results")
+        
+        # Use custom LLM service if API key is provided, otherwise use global instance
+        from ..services.llm import LLMService
+        if openai_api_key:
+            custom_llm_service = LLMService(openai_api_key=openai_api_key)
+            service = custom_llm_service
+        else:
+            service = llm_service
         
         try:
             # Create tasks to assess credibility for all search results
             credibility_tasks = []
             for result in state.search_results:
                 if result.credibility is None:  # Only calculate if not already set
-                    task = llm_service.assess_credibility(
+                    task = service.assess_credibility(
                         title=result.title,
                         snippet=result.snippet,
                         source=result.source,

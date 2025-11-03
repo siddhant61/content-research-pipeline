@@ -39,6 +39,9 @@ class ContentResearchPipeline:
         include_news: bool = True,
         max_results: Optional[int] = None,
         job_id: Optional[str] = None,
+        openai_api_key: Optional[str] = None,
+        google_api_key: Optional[str] = None,
+        google_cse_id: Optional[str] = None,
         **kwargs
     ) -> PipelineResult:
         """
@@ -50,6 +53,10 @@ class ContentResearchPipeline:
             include_videos: Whether to include video search
             include_news: Whether to include news search
             max_results: Maximum number of search results per source
+            job_id: Optional job ID for saving report to file
+            openai_api_key: Optional OpenAI API key to override settings
+            google_api_key: Optional Google API key to override settings
+            google_cse_id: Optional Google CSE ID to override settings
             **kwargs: Additional pipeline configuration
             
         Returns:
@@ -64,7 +71,7 @@ class ContentResearchPipeline:
         
         try:
             # Phase 1: Search
-            await self._search_phase(state, include_images, include_videos, include_news)
+            await self._search_phase(state, include_images, include_videos, include_news, google_api_key, google_cse_id)
             
             # Phase 2: Scrape
             state.update_status("scraping")
@@ -76,7 +83,7 @@ class ContentResearchPipeline:
             
             # Phase 4: Analyze
             state.update_status("analyzing")
-            await self._analysis_phase(state)
+            await self._analysis_phase(state, openai_api_key)
             
             # Phase 5: Visualize
             state.update_status("visualizing")
@@ -117,7 +124,9 @@ class ContentResearchPipeline:
         state: PipelineState,
         include_images: bool,
         include_videos: bool,
-        include_news: bool
+        include_news: bool,
+        google_api_key: Optional[str] = None,
+        google_cse_id: Optional[str] = None
     ) -> None:
         """
         Execute the search phase.
@@ -127,24 +136,34 @@ class ContentResearchPipeline:
             include_images: Whether to include image search
             include_videos: Whether to include video search
             include_news: Whether to include news search
+            google_api_key: Optional Google API key to override settings
+            google_cse_id: Optional Google CSE ID to override settings
         """
         self.logger.info("Executing search phase")
         
+        # Use custom search service if API keys are provided, otherwise use global instance
+        from ..services.search import SearchService
+        if google_api_key or google_cse_id:
+            custom_search_service = SearchService(google_api_key=google_api_key, google_cse_id=google_cse_id)
+            service = custom_search_service
+        else:
+            service = search_service
+        
         # Perform web search
-        search_results = await search_service.search_web(state.query)
+        search_results = await service.search_web(state.query)
         state.search_results = search_results
         
         # Perform additional searches in parallel
         tasks = []
         
         if include_news:
-            tasks.append(search_service.search_news(state.query))
+            tasks.append(service.search_news(state.query))
         
         if include_images:
-            tasks.append(search_service.search_images(state.query))
+            tasks.append(service.search_images(state.query))
         
         if include_videos:
-            tasks.append(search_service.search_videos(state.query))
+            tasks.append(service.search_videos(state.query))
         
         # Gather results
         if tasks:
@@ -223,23 +242,25 @@ class ContentResearchPipeline:
             else:
                 self.logger.warning("Failed to store content in vector database")
     
-    async def _analysis_phase(self, state: PipelineState) -> None:
+    async def _analysis_phase(self, state: PipelineState, openai_api_key: Optional[str] = None) -> None:
         """
         Execute the analysis phase.
         
         Args:
             state: Current pipeline state
+            openai_api_key: Optional OpenAI API key to override settings
         """
         self.logger.info("Executing analysis phase")
         
         # Calculate credibility for search results
-        await analysis_processor.calculate_credibility(state)
+        await analysis_processor.calculate_credibility(state, openai_api_key)
         
         # Perform comprehensive analysis
         if state.scraped_content:
             analysis_result = await analysis_processor.analyze(
                 query=state.query,
-                scraped_contents=state.scraped_content
+                scraped_contents=state.scraped_content,
+                openai_api_key=openai_api_key
             )
             state.analysis = analysis_result
             self.logger.info("Analysis phase completed")

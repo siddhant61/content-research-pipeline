@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Research Pipeline</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Content Research Pipeline</h1>
+            <p class="subtitle">AI-Powered Content Research & Analysis</p>
+            <button id="settingsBtn" class="settings-btn">⚙️ Settings</button>
+        </header>
+
+        <main>
+            <div class="search-section">
+                <h2>Start Research</h2>
+                <div class="input-group">
+                    <textarea 
+                        id="queryInput" 
+                        placeholder="Enter your research query here... (e.g., 'artificial intelligence trends 2024')"
+                        rows="4"
+                    ></textarea>
+                </div>
+                <div class="options-group">
+                    <label>
+                        <input type="checkbox" id="includeImages" checked>
+                        Include Images
+                    </label>
+                    <label>
+                        <input type="checkbox" id="includeVideos" checked>
+                        Include Videos
+                    </label>
+                    <label>
+                        <input type="checkbox" id="includeNews" checked>
+                        Include News
+                    </label>
+                </div>
+                <button id="startBtn" class="primary-btn">Start Research</button>
+            </div>
+
+            <div id="statusSection" class="status-section" style="display: none;">
+                <h2>Job Status</h2>
+                <div class="status-card">
+                    <div class="status-header">
+                        <span id="statusText" class="status-badge">Pending</span>
+                        <span id="jobId" class="job-id"></span>
+                    </div>
+                    <div id="statusDetails" class="status-details">
+                        <p id="statusMessage">Initializing research pipeline...</p>
+                    </div>
+                    <div id="progressBar" class="progress-bar">
+                        <div id="progress" class="progress"></div>
+                    </div>
+                    <div id="resultSection" class="result-section" style="display: none;">
+                        <h3>✅ Research Complete!</h3>
+                        <p>Your comprehensive research report is ready.</p>
+                        <a id="reportLink" href="#" target="_blank" class="report-btn">View Full Report</a>
+                    </div>
+                    <div id="errorSection" class="error-section" style="display: none;">
+                        <h3>❌ Error</h3>
+                        <p id="errorMessage"></p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Content Research Pipeline v1.0.0 | Powered by AI</p>
+        </footer>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="settings-info">Configure your API keys for the research pipeline. These keys are stored securely in your browser's local storage.</p>
+                
+                <div class="form-group">
+                    <label for="openaiKey">OpenAI API Key *</label>
+                    <input type="password" id="openaiKey" placeholder="sk-...">
+                    <small>Required for AI analysis and content generation</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="googleApiKey">Google API Key *</label>
+                    <input type="password" id="googleApiKey" placeholder="AIza...">
+                    <small>Required for web, image, and video search</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="googleCseId">Google CSE ID *</label>
+                    <input type="text" id="googleCseId" placeholder="012345678901234567890:abcdefg">
+                    <small>Required for custom search functionality</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pipelineApiKey">Pipeline API Key (Optional)</label>
+                    <input type="password" id="pipelineApiKey" placeholder="Leave empty if not required">
+                    <small>Optional: Only if your server requires authentication</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="clearKeysBtn" class="secondary-btn">Clear All Keys</button>
+                    <button id="saveKeysBtn" class="primary-btn">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

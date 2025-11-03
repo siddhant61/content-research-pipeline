@@ -130,6 +130,7 @@ Thumbs.db
 # HTML reports
 *.html
 !templates/*.html
+!ui/*.html
 
 # Media files
 *.mp4
