@@ -4,7 +4,7 @@ Tests for API module.
 
 import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 from src.content_research_pipeline.api.main import app, jobs, ResearchRequest
@@ -23,6 +23,14 @@ class TestAPI:
         # Clear jobs before each test
         jobs.clear()
         self.client = TestClient(app)
+        
+        # Mock Redis client to None to use in-memory fallback
+        with patch('src.content_research_pipeline.services.job_store.redis.Redis') as mock_redis:
+            mock_redis.side_effect = Exception("Redis not available")
+        
+        # Ensure API key is not set for tests (optional authentication)
+        with patch('src.content_research_pipeline.config.settings.settings') as mock_settings:
+            mock_settings.api_key = None
     
     def test_root_endpoint(self):
         """Test root endpoint returns correct response."""
@@ -247,3 +255,141 @@ class TestAPI:
         response = self.client.delete(f"/jobs/{job_id}")
         assert response.status_code == 400
         assert "still running" in response.json()["detail"].lower()
+
+
+class TestAPIAuthentication:
+    """Test API authentication."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        jobs.clear()
+        self.client = TestClient(app)
+    
+    @patch('src.content_research_pipeline.api.main.settings')
+    def test_api_key_required(self, mock_settings):
+        """Test that API key is required when configured."""
+        # Set API key in settings
+        mock_settings.api_key = "test-api-key-123"
+        mock_settings.max_search_results = 5
+        
+        # Try to access protected endpoint without API key
+        request_data = {
+            "query": "test query",
+            "include_images": True,
+            "include_videos": True,
+            "include_news": True
+        }
+        
+        response = self.client.post("/research", json=request_data)
+        
+        # Should return 401 Unauthorized
+        assert response.status_code == 401
+    
+    @patch('src.content_research_pipeline.api.main.settings')
+    def test_api_key_valid(self, mock_settings):
+        """Test that valid API key allows access."""
+        # Set API key in settings
+        mock_settings.api_key = "test-api-key-123"
+        mock_settings.max_search_results = 5
+        
+        request_data = {
+            "query": "test query",
+            "include_images": True,
+            "include_videos": True,
+            "include_news": True
+        }
+        
+        # Access endpoint with valid API key
+        response = self.client.post(
+            "/research",
+            json=request_data,
+            headers={"X-API-Key": "test-api-key-123"}
+        )
+        
+        # Should return 200 OK
+        assert response.status_code == 200
+    
+    @patch('src.content_research_pipeline.api.main.settings')
+    def test_api_key_invalid(self, mock_settings):
+        """Test that invalid API key denies access."""
+        # Set API key in settings
+        mock_settings.api_key = "test-api-key-123"
+        mock_settings.max_search_results = 5
+        
+        request_data = {
+            "query": "test query",
+            "include_images": True,
+            "include_videos": True,
+            "include_news": True
+        }
+        
+        # Access endpoint with invalid API key
+        response = self.client.post(
+            "/research",
+            json=request_data,
+            headers={"X-API-Key": "wrong-key"}
+        )
+        
+        # Should return 401 Unauthorized
+        assert response.status_code == 401
+    
+    @patch('src.content_research_pipeline.api.main.settings')
+    def test_api_key_optional(self, mock_settings):
+        """Test that API key is optional when not configured."""
+        # No API key configured
+        mock_settings.api_key = None
+        mock_settings.max_search_results = 5
+        
+        request_data = {
+            "query": "test query",
+            "include_images": True,
+            "include_videos": True,
+            "include_news": True
+        }
+        
+        # Access endpoint without API key
+        response = self.client.post("/research", json=request_data)
+        
+        # Should return 200 OK (authentication skipped)
+        assert response.status_code == 200
+
+
+class TestAPIOpenAPITags:
+    """Test OpenAPI documentation enhancements."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.client = TestClient(app)
+    
+    def test_openapi_schema_has_tags(self):
+        """Test that OpenAPI schema includes tags."""
+        response = self.client.get("/openapi.json")
+        assert response.status_code == 200
+        
+        schema = response.json()
+        
+        # Check that tags are defined
+        assert "tags" in schema
+        assert len(schema["tags"]) > 0
+        
+        # Check for expected tags
+        tag_names = [tag["name"] for tag in schema["tags"]]
+        assert "health" in tag_names
+        assert "research" in tag_names
+        assert "jobs" in tag_names
+    
+    def test_endpoints_have_tags(self):
+        """Test that endpoints are tagged."""
+        response = self.client.get("/openapi.json")
+        assert response.status_code == 200
+        
+        schema = response.json()
+        paths = schema["paths"]
+        
+        # Check that /research endpoint has tags
+        assert "tags" in paths["/research"]["post"]
+        assert "research" in paths["/research"]["post"]["tags"]
+        
+        # Check that /jobs endpoint has tags
+        assert "tags" in paths["/jobs"]["get"]
+        assert "jobs" in paths["/jobs"]["get"]["tags"]
