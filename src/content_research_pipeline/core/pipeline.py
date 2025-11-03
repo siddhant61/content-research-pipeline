@@ -16,6 +16,8 @@ from ..data.models import (
 )
 from ..services.search import search_service
 from ..services.scraper import scraper_service
+from ..services.vector_store import vector_store_service
+from .analysis import analysis_processor
 
 logger = get_logger(__name__)
 
@@ -209,8 +211,14 @@ class ContentResearchPipeline:
             state: Current pipeline state
         """
         self.logger.info("Executing storage phase")
-        # Will be implemented in Task 2.1
-        pass
+        
+        # Store scraped content in vector store
+        if state.scraped_content:
+            success = await vector_store_service.add_documents(state.scraped_content)
+            if success:
+                self.logger.info("Content stored in vector database")
+            else:
+                self.logger.warning("Failed to store content in vector database")
     
     async def _analysis_phase(self, state: PipelineState) -> None:
         """
@@ -220,8 +228,17 @@ class ContentResearchPipeline:
             state: Current pipeline state
         """
         self.logger.info("Executing analysis phase")
-        # Will be implemented in Task 2.3
-        pass
+        
+        # Perform comprehensive analysis
+        if state.scraped_content:
+            analysis_result = await analysis_processor.analyze(
+                query=state.query,
+                scraped_contents=state.scraped_content
+            )
+            state.analysis = analysis_result
+            self.logger.info("Analysis phase completed")
+        else:
+            self.logger.warning("No scraped content available for analysis")
     
     async def _visualization_phase(self, state: PipelineState) -> VisualizationData:
         """
