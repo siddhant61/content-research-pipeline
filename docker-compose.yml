@@ -1,0 +1,83 @@
+services:
+  # Redis service for caching and job storage
+  redis:
+    image: redis:alpine
+    container_name: content-research-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - content-research-network
+
+  # ChromaDB vector database service
+  chromadb:
+    image: chromadb/chroma:0.4.20
+    container_name: content-research-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - content-research-network
+
+  # Content Research Pipeline API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-research-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override settings for containerized environment
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      # Mount reports directory for persistence
+      - ./reports:/app/reports
+      # Mount cache directory (optional)
+      - ./cache:/app/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - content-research-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
+  chromadb_data:
+    driver: local
+
+networks:
+  content-research-network:
+    driver: bridge
