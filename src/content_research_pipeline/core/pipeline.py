@@ -231,6 +231,9 @@ class ContentResearchPipeline:
         """
         self.logger.info("Executing analysis phase")
         
+        # Calculate credibility for search results
+        await analysis_processor.calculate_credibility(state)
+        
         # Perform comprehensive analysis
         if state.scraped_content:
             analysis_result = await analysis_processor.analyze(
