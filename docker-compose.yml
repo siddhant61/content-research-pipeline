@@ -17,7 +17,7 @@ services:
 
   # ChromaDB vector database service
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.4.20
     container_name: content-research-chromadb
     ports:
       - "8001:8000"
@@ -55,8 +55,6 @@ services:
     volumes:
       # Mount reports directory for persistence
       - ./reports:/app/reports
-      # Mount chroma_db for local development (optional)
-      - ./chroma_db:/app/chroma_db
       # Mount cache directory (optional)
       - ./cache:/app/cache
     depends_on:

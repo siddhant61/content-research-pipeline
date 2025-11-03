@@ -117,6 +117,7 @@ jobs:
     - name: Stop services with docker compose
       if: always()
       run: |
+        # Remove volumes (-v) to ensure clean state for next run
         docker compose down -v
 
   security:
