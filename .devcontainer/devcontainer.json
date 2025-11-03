@@ -1,55 +1,29 @@
 {
-    "name": "Content Research Pipeline",
-    "dockerComposeFile": "../docker-compose.yml",
-    "service": "api",
-    "workspaceFolder": "/app",
-    
-    "forwardPorts": [
-        8000,
-        6379,
-        8001
-    ],
-    
-    "portsAttributes": {
-        "8000": {
-            "label": "API & UI",
-            "onAutoForward": "openBrowser"
-        },
-        "6379": {
-            "label": "Redis"
-        },
-        "8001": {
-            "label": "ChromaDB"
-        }
+  "name": "Content Research Pipeline Codespace",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node": {
+      "version": "lts"
     },
-    
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "ms-azuretools.vscode-docker",
-                "redhat.vscode-yaml"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "python.linting.enabled": true,
-                "python.linting.pylintEnabled": false,
-                "python.linting.flake8Enabled": true,
-                "python.formatting.provider": "black",
-                "editor.formatOnSave": true,
-                "files.watcherExclude": {
-                    "**/chroma_db/**": true,
-                    "**/cache/**": true,
-                    "**/.git/objects/**": true,
-                    "**/.git/subtree-cache/**": true,
-                    "**/node_modules/*/**": true
-                }
-            }
-        }
-    },
-    
-    "postCreateCommand": "echo 'Content Research Pipeline is ready! Open http://localhost:8000 to use the UI.'",
-    
-    "remoteUser": "root"
+    "ghcr.io/devcontainers/features/python": {
+      "version": "3.11"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  "postCreateCommand": "python -m pip install --upgrade pip || true; if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi; if [ -f pyproject.toml ]; then python -m pip install -U poetry || true; fi; if [ -f .devcontainer/postCreate.sh ]; then bash .devcontainer/postCreate.sh || true; fi",
+  "forwardPorts": [8000, 8080],
+  "remoteUser": "vscode"
 }
