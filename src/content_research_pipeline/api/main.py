@@ -6,25 +6,77 @@ import asyncio
 import uuid
 from typing import Dict, Optional
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Security, Depends
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..config.settings import settings
 from ..config.logging import get_logger
 from ..core.pipeline import ContentResearchPipeline
 from ..data.models import PipelineResult
+from ..services.job_store import job_store_service
 
 logger = get_logger(__name__)
 
-# Initialize FastAPI app
+# Initialize FastAPI app with OpenAPI tags
 app = FastAPI(
     title="Content Research Pipeline API",
     description="A comprehensive, AI-powered content research and analysis system",
-    version="1.0.0"
+    version="1.0.0",
+    openapi_tags=[
+        {
+            "name": "health",
+            "description": "Health check and status endpoints"
+        },
+        {
+            "name": "research",
+            "description": "Research job management operations"
+        },
+        {
+            "name": "jobs",
+            "description": "Job listing and management operations"
+        }
+    ]
 )
 
-# In-memory job storage (in production, use Redis or a database)
+# Configure static file serving for reports
+reports_dir = Path("reports")
+reports_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/reports", StaticFiles(directory=str(reports_dir)), name="reports")
+
+# API Key security
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def verify_api_key(api_key: str = Security(api_key_header)) -> str:
+    """
+    Verify API key authentication.
+    
+    Args:
+        api_key: API key from request header
+        
+    Returns:
+        API key if valid
+        
+    Raises:
+        HTTPException: If API key is invalid or missing
+    """
+    # If no API key is configured, skip authentication
+    if not settings.api_key:
+        return None
+    
+    if not api_key or api_key != settings.api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    return api_key
+
+
+# Backward compatibility: in-memory fallback
 jobs: Dict[str, Dict] = {}
 
 
@@ -52,6 +104,7 @@ class JobStatusResponse(BaseModel):
     created_at: str = Field(..., description="Job creation timestamp")
     completed_at: Optional[str] = Field(None, description="Job completion timestamp")
     result: Optional[Dict] = Field(None, description="Pipeline result (when completed)")
+    report_url: Optional[str] = Field(None, description="URL to the generated HTML report")
     error: Optional[str] = Field(None, description="Error message (if failed)")
 
 
@@ -66,8 +119,11 @@ async def run_research_pipeline(job_id: str, request: ResearchRequest):
     try:
         logger.info(f"Starting research job {job_id} for query: {request.query}")
         
-        # Update job status
-        jobs[job_id]["status"] = "running"
+        # Update job status in Redis or fallback
+        if job_store_service.redis_client:
+            job_store_service.update_job(job_id, {"status": "running"})
+        else:
+            jobs[job_id]["status"] = "running"
         
         # Initialize and run pipeline
         pipeline = ContentResearchPipeline()
@@ -76,26 +132,43 @@ async def run_research_pipeline(job_id: str, request: ResearchRequest):
             include_images=request.include_images,
             include_videos=request.include_videos,
             include_news=request.include_news,
-            max_results=request.max_results or settings.max_search_results
+            max_results=request.max_results or settings.max_search_results,
+            job_id=job_id
         )
         
         # Update job with result
-        jobs[job_id]["status"] = "completed"
-        jobs[job_id]["completed_at"] = datetime.now().isoformat()
-        jobs[job_id]["result"] = result
+        completed_at = datetime.now().isoformat()
+        if job_store_service.redis_client:
+            job_store_service.update_job(job_id, {
+                "status": "completed",
+                "completed_at": completed_at,
+                "result": result.dict()
+            })
+        else:
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["completed_at"] = completed_at
+            jobs[job_id]["result"] = result
         
         logger.info(f"Research job {job_id} completed successfully")
         
     except Exception as e:
         logger.error(f"Research job {job_id} failed: {e}")
-        jobs[job_id]["status"] = "failed"
-        jobs[job_id]["completed_at"] = datetime.now().isoformat()
-        jobs[job_id]["error"] = str(e)
+        completed_at = datetime.now().isoformat()
+        if job_store_service.redis_client:
+            job_store_service.update_job(job_id, {
+                "status": "failed",
+                "completed_at": completed_at,
+                "error": str(e)
+            })
+        else:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["completed_at"] = completed_at
+            jobs[job_id]["error"] = str(e)
 
 
-@app.get("/")
+@app.get("/", tags=["health"])
 async def root():
-    """Root endpoint."""
+    """Root endpoint - API information."""
     return {
         "name": "Content Research Pipeline API",
         "version": "1.0.0",
@@ -103,19 +176,28 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 async def health():
-    """Health check endpoint."""
+    """Health check endpoint - verify API and services are operational."""
+    redis_status = "connected" if job_store_service.redis_client else "disconnected"
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "redis": redis_status
     }
 
 
-@app.post("/research", response_model=JobResponse)
+@app.post(
+    "/research",
+    response_model=JobResponse,
+    tags=["research"],
+    summary="Start a new research job",
+    description="Submit a research query to start an asynchronous content research and analysis job."
+)
 async def research(
     request: ResearchRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    api_key: str = Depends(verify_api_key)
 ):
     """
     Start a new research job.
@@ -123,6 +205,7 @@ async def research(
     Args:
         request: Research request parameters
         background_tasks: FastAPI background tasks manager
+        api_key: API key for authentication
         
     Returns:
         JobResponse with job_id and initial status
@@ -132,7 +215,7 @@ async def research(
         job_id = str(uuid.uuid4())
         
         # Create job entry
-        jobs[job_id] = {
+        job_data = {
             "job_id": job_id,
             "status": "pending",
             "query": request.query,
@@ -141,6 +224,12 @@ async def research(
             "result": None,
             "error": None
         }
+        
+        # Store in Redis or fallback to memory
+        if job_store_service.redis_client:
+            job_store_service.create_job(job_id, job_data)
+        else:
+            jobs[job_id] = job_data
         
         # Start background task using asyncio
         asyncio.create_task(run_research_pipeline(job_id, request))
@@ -158,23 +247,37 @@ async def research(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/status/{job_id}", response_model=JobStatusResponse)
-async def get_status(job_id: str):
+@app.get(
+    "/status/{job_id}",
+    response_model=JobStatusResponse,
+    tags=["research"],
+    summary="Get job status",
+    description="Retrieve the current status and results of a research job by its ID."
+)
+async def get_status(
+    job_id: str,
+    api_key: str = Depends(verify_api_key)
+):
     """
     Get the status of a research job.
     
     Args:
         job_id: Unique job identifier
+        api_key: API key for authentication
         
     Returns:
         JobStatusResponse with job status and result (if completed)
     """
     try:
-        # Check if job exists
-        if job_id not in jobs:
-            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-        
-        job = jobs[job_id]
+        # Get job from Redis or fallback
+        if job_store_service.redis_client:
+            job = job_store_service.get_job(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        else:
+            if job_id not in jobs:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            job = jobs[job_id]
         
         # Prepare response
         response_data = {
@@ -183,16 +286,25 @@ async def get_status(job_id: str):
             "query": job["query"],
             "created_at": job["created_at"],
             "completed_at": job["completed_at"],
-            "error": job.get("error")
+            "error": job.get("error"),
+            "report_url": None
         }
         
         # Include result if completed (excluding HTML report)
-        if job["status"] == "completed" and job["result"]:
-            result: PipelineResult = job["result"]
-            # Convert to dict, excluding html_report
-            result_dict = result.dict()
+        if job["status"] == "completed" and job.get("result"):
+            result = job["result"]
+            # Handle both PipelineResult objects and dicts
+            if isinstance(result, PipelineResult):
+                result_dict = result.dict()
+            else:
+                result_dict = result.copy() if isinstance(result, dict) else {}
             result_dict.pop("html_report", None)  # Exclude HTML report from JSON response
             response_data["result"] = result_dict
+            
+            # Add report URL if report file exists
+            report_path = Path("reports") / f"{job_id}.html"
+            if report_path.exists():
+                response_data["report_url"] = f"/reports/{job_id}.html"
         
         return JobStatusResponse(**response_data)
         
@@ -203,47 +315,65 @@ async def get_status(job_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/jobs")
-async def list_jobs(limit: int = 10, status: Optional[str] = None):
+@app.get(
+    "/jobs",
+    tags=["jobs"],
+    summary="List all jobs",
+    description="Retrieve a list of all research jobs with optional filtering by status."
+)
+async def list_jobs(
+    limit: int = 10,
+    status: Optional[str] = None,
+    api_key: str = Depends(verify_api_key)
+):
     """
     List all jobs.
     
     Args:
         limit: Maximum number of jobs to return
         status: Filter by status (pending, running, completed, failed)
+        api_key: API key for authentication
         
     Returns:
         List of job summaries
     """
     try:
-        # Filter jobs by status if provided
-        filtered_jobs = jobs.values()
-        if status:
-            filtered_jobs = [j for j in filtered_jobs if j["status"] == status]
-        
-        # Sort by creation time (most recent first)
-        sorted_jobs = sorted(
-            filtered_jobs,
-            key=lambda j: j["created_at"],
-            reverse=True
-        )
-        
-        # Limit results
-        limited_jobs = sorted_jobs[:limit]
+        # Use Redis or fallback
+        if job_store_service.redis_client:
+            job_list = job_store_service.list_jobs(limit=limit, status=status)
+            total = job_store_service.get_job_count()
+            filtered = job_store_service.get_job_count(status=status) if status else total
+        else:
+            # Filter jobs by status if provided
+            filtered_jobs = list(jobs.values())
+            if status:
+                filtered_jobs = [j for j in filtered_jobs if j["status"] == status]
+            
+            # Sort by creation time (most recent first)
+            sorted_jobs = sorted(
+                filtered_jobs,
+                key=lambda j: j["created_at"],
+                reverse=True
+            )
+            
+            # Limit results
+            job_list = sorted_jobs[:limit]
+            total = len(jobs)
+            filtered = len(filtered_jobs)
         
         # Return summary without full results
         return {
-            "total": len(jobs),
-            "filtered": len(filtered_jobs),
+            "total": total,
+            "filtered": filtered,
             "jobs": [
                 {
                     "job_id": j["job_id"],
                     "status": j["status"],
                     "query": j["query"],
                     "created_at": j["created_at"],
-                    "completed_at": j["completed_at"]
+                    "completed_at": j.get("completed_at")
                 }
-                for j in limited_jobs
+                for j in job_list
             ]
         }
         
@@ -252,30 +382,55 @@ async def list_jobs(limit: int = 10, status: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/jobs/{job_id}")
-async def delete_job(job_id: str):
+@app.delete(
+    "/jobs/{job_id}",
+    tags=["jobs"],
+    summary="Delete a job",
+    description="Delete a completed or failed research job. Running jobs cannot be deleted."
+)
+async def delete_job(
+    job_id: str,
+    api_key: str = Depends(verify_api_key)
+):
     """
     Delete a job.
     
     Args:
         job_id: Unique job identifier
+        api_key: API key for authentication
         
     Returns:
         Success message
     """
     try:
-        if job_id not in jobs:
-            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-        
-        # Check if job is still running
-        if jobs[job_id]["status"] in ["pending", "running"]:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot delete a job that is still running"
-            )
-        
-        # Delete job
-        del jobs[job_id]
+        # Use Redis or fallback
+        if job_store_service.redis_client:
+            job = job_store_service.get_job(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            
+            # Check if job is still running
+            if job["status"] in ["pending", "running"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot delete a job that is still running"
+                )
+            
+            # Delete job
+            job_store_service.delete_job(job_id)
+        else:
+            if job_id not in jobs:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            
+            # Check if job is still running
+            if jobs[job_id]["status"] in ["pending", "running"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot delete a job that is still running"
+                )
+            
+            # Delete job
+            del jobs[job_id]
         
         logger.info(f"Deleted job {job_id}")
         
