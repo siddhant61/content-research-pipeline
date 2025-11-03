@@ -17,13 +17,18 @@ logger = get_logger(__name__)
 class LLMService:
     """Service for handling language model interactions."""
     
-    def __init__(self):
-        """Initialize the LLM service."""
+    def __init__(self, openai_api_key: Optional[str] = None):
+        """Initialize the LLM service.
+        
+        Args:
+            openai_api_key: Optional OpenAI API key to override settings
+        """
+        self.api_key = openai_api_key or settings.openai_api_key
         self.llm = ChatOpenAI(
             model=settings.llm_model,
             temperature=settings.llm_temperature,
             max_tokens=settings.max_tokens,
-            api_key=settings.openai_api_key
+            api_key=self.api_key
         )
         logger.info(f"LLM service initialized with model: {settings.llm_model}")
     

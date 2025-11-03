@@ -20,10 +20,20 @@ logger = get_logger(__name__)
 class SearchService:
     """Service for handling search operations."""
     
-    def __init__(self):
-        """Initialize the search service."""
-        self.search_wrapper = GoogleSearchAPIWrapper()
-        self.cse_service = build("customsearch", "v1", developerKey=settings.google_api_key)
+    def __init__(self, google_api_key: Optional[str] = None, google_cse_id: Optional[str] = None):
+        """Initialize the search service.
+        
+        Args:
+            google_api_key: Optional Google API key to override settings
+            google_cse_id: Optional Google CSE ID to override settings
+        """
+        self.google_api_key = google_api_key or settings.google_api_key
+        self.google_cse_id = google_cse_id or settings.google_cse_id
+        self.search_wrapper = GoogleSearchAPIWrapper(
+            google_api_key=self.google_api_key,
+            google_cse_id=self.google_cse_id
+        )
+        self.cse_service = build("customsearch", "v1", developerKey=self.google_api_key)
         
     @retry(
         stop=stop_after_attempt(3),
@@ -121,7 +131,7 @@ class SearchService:
             def _search_images():
                 return self.cse_service.cse().list(
                     q=query,
-                    cx=settings.google_cse_id,
+                    cx=self.google_cse_id,
                     searchType="image",
                     num=num_results
                 ).execute()
