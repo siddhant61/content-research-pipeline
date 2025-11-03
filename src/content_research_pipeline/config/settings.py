@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     api_host: str = Field("0.0.0.0", env="API_HOST")
     api_port: int = Field(8000, env="API_PORT")
     api_reload: bool = Field(True, env="API_RELOAD")
+    api_key: Optional[str] = Field(None, env="API_KEY")
+    
+    # Redis Configuration
+    redis_host: str = Field("localhost", env="REDIS_HOST")
+    redis_port: int = Field(6379, env="REDIS_PORT")
+    redis_db: int = Field(0, env="REDIS_DB")
+    redis_password: Optional[str] = Field(None, env="REDIS_PASSWORD")
     
     # Media Processing
     download_images: bool = Field(True, env="DOWNLOAD_IMAGES")

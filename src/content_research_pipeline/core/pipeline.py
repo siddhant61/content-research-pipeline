@@ -38,6 +38,7 @@ class ContentResearchPipeline:
         include_videos: bool = True,
         include_news: bool = True,
         max_results: Optional[int] = None,
+        job_id: Optional[str] = None,
         **kwargs
     ) -> PipelineResult:
         """
@@ -83,7 +84,7 @@ class ContentResearchPipeline:
             
             # Phase 6: Generate Report
             state.update_status("generating_report")
-            html_report = await self._report_generation_phase(state, visualization)
+            html_report = await self._report_generation_phase(state, visualization, job_id)
             
             # Complete
             state.update_status("completed")
@@ -269,7 +270,8 @@ class ContentResearchPipeline:
     async def _report_generation_phase(
         self, 
         state: PipelineState,
-        visualization: VisualizationData
+        visualization: VisualizationData,
+        job_id: Optional[str] = None
     ) -> Optional[str]:
         """
         Execute the report generation phase.
@@ -277,6 +279,7 @@ class ContentResearchPipeline:
         Args:
             state: Current pipeline state
             visualization: Visualization data
+            job_id: Optional job ID for saving report to file
             
         Returns:
             HTML report string or None
@@ -290,6 +293,19 @@ class ContentResearchPipeline:
             visualization=visualization,
             processing_time=processing_time
         )
+        
+        # Save report to static file if job_id is provided
+        if job_id and html_report:
+            try:
+                from pathlib import Path
+                reports_dir = Path("reports")
+                reports_dir.mkdir(parents=True, exist_ok=True)
+                
+                report_path = reports_dir / f"{job_id}.html"
+                report_path.write_text(html_report, encoding="utf-8")
+                self.logger.info(f"Saved report to {report_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to save report to file: {e}")
         
         self.logger.info("Report generation phase completed")
         return html_report

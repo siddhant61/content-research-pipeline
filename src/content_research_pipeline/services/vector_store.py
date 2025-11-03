@@ -28,13 +28,26 @@ class VectorStoreService:
         try:
             logger.info("Initializing ChromaDB client")
             
-            # Create ChromaDB client with persistent storage
-            self.client = chromadb.Client(
-                ChromaSettings(
-                    persist_directory=settings.chroma_persist_directory,
-                    anonymized_telemetry=False
+            # Try to connect to ChromaDB server (client/server mode)
+            try:
+                logger.info(f"Attempting to connect to ChromaDB server at {settings.chroma_host}:{settings.chroma_port}")
+                self.client = chromadb.HttpClient(
+                    host=settings.chroma_host,
+                    port=settings.chroma_port
                 )
-            )
+                # Test connection by listing collections
+                self.client.heartbeat()
+                logger.info("Successfully connected to ChromaDB server")
+            except Exception as e:
+                logger.warning(f"Failed to connect to ChromaDB server: {e}")
+                logger.info("Falling back to local ChromaDB client with persistent storage")
+                # Fallback to local client with persistent storage
+                self.client = chromadb.Client(
+                    ChromaSettings(
+                        persist_directory=settings.chroma_persist_directory,
+                        anonymized_telemetry=False
+                    )
+                )
             
             # Get or create collection
             self.collection = self.client.get_or_create_collection(
