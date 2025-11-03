@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide explains how to deploy the Content Research Pipeline using Docker and docker-compose.
+This guide explains how to deploy the Content Research Pipeline using Docker and Docker Compose.
 
 ## Table of Contents
 
@@ -83,7 +83,7 @@ MAX_CONTENT_LENGTH=10000000
 To launch the entire application stack (API, Redis, and ChromaDB):
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This command will:
@@ -97,33 +97,33 @@ This command will:
 To view logs from all services:
 
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 To view logs from a specific service:
 
 ```bash
-docker-compose logs -f api
-docker-compose logs -f redis
-docker-compose logs -f chromadb
+docker compose logs -f api
+docker compose logs -f redis
+docker compose logs -f chromadb
 ```
 
 ### Check Service Status
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### Stop the Application
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 To stop and remove volumes (⚠️ this will delete all data):
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Accessing the API
@@ -217,7 +217,7 @@ All services communicate through a dedicated Docker network (`content-research-n
 
 **Check logs for errors:**
 ```bash
-docker-compose logs
+docker compose logs
 ```
 
 **Ensure ports are not in use:**
@@ -243,7 +243,7 @@ sudo lsof -ti:8001 | xargs kill -9
 **Check service dependencies:**
 ```bash
 # Verify Redis is running
-docker-compose exec redis redis-cli ping
+docker compose exec redis redis-cli ping
 # Expected output: PONG
 
 # Verify ChromaDB is running
@@ -257,8 +257,8 @@ If you see errors about missing spaCy model:
 
 ```bash
 # Rebuild the API container
-docker-compose build api
-docker-compose up -d api
+docker compose build api
+docker compose up -d api
 ```
 
 ### Permission Issues with Volumes
@@ -276,15 +276,15 @@ chmod 755 reports chroma_db cache
 To rebuild the API after making code changes:
 
 ```bash
-docker-compose build api
-docker-compose up -d api
+docker compose build api
+docker compose up -d api
 ```
 
 Or rebuild all services:
 
 ```bash
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
 ## Production Considerations
@@ -302,7 +302,7 @@ For production workloads:
 
 1. **Multiple API Workers**: Scale the API service
    ```bash
-   docker-compose up -d --scale api=3
+   docker compose up -d --scale api=3
    ```
 
 2. **External Services**: Use managed Redis and vector database services
