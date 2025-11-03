@@ -2,6 +2,7 @@
 Tests for job store service.
 """
 
+import json
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
@@ -76,7 +77,6 @@ class TestJobStoreService:
         job_id = "test-job-123"
         job_data = {"job_id": job_id, "status": "completed"}
         
-        import json
         self.mock_redis.get.return_value = json.dumps(job_data)
         
         result = service.get_job(job_id)
@@ -105,7 +105,6 @@ class TestJobStoreService:
         existing_data = {"job_id": job_id, "status": "pending"}
         updates = {"status": "running"}
         
-        import json
         self.mock_redis.get.return_value = json.dumps(existing_data)
         
         result = service.update_job(job_id, updates)
@@ -145,7 +144,6 @@ class TestJobStoreService:
         job_ids = [b"job1", b"job2", b"job3"]
         self.mock_redis.zrevrange.return_value = job_ids
         
-        import json
         self.mock_redis.get.side_effect = [
             json.dumps({"job_id": "job1", "status": "completed"}),
             json.dumps({"job_id": "job2", "status": "pending"}),
@@ -165,7 +163,6 @@ class TestJobStoreService:
         job_ids = [b"job1", b"job2"]
         self.mock_redis.zrevrange.return_value = job_ids
         
-        import json
         self.mock_redis.get.side_effect = [
             json.dumps({"job_id": "job1", "status": "completed"}),
             json.dumps({"job_id": "job2", "status": "pending"})

@@ -4,7 +4,6 @@ Tests for caching utilities with Redis backend.
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-import pickle
 
 from src.content_research_pipeline.utils.caching import (
     cache_result,

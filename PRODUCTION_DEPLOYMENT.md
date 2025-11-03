@@ -378,9 +378,22 @@ print(f"Cleaned up {stats} expired entries")
 
 1. **API Key Management**: Store API keys securely (e.g., AWS Secrets Manager, HashiCorp Vault)
 2. **Redis Security**: Use Redis AUTH and TLS in production
-3. **Network Isolation**: Run services in a private network
-4. **Rate Limiting**: Consider adding rate limiting middleware
-5. **CORS**: Configure CORS appropriately for your frontend
+3. **Redis Namespace**: If sharing Redis with other apps, implement key prefixing (e.g., `crp:cache:*`, `crp:job:*`)
+4. **Network Isolation**: Run services in a private network
+5. **Rate Limiting**: Consider adding rate limiting middleware
+6. **CORS**: Configure CORS appropriately for your frontend
+
+### Redis Key Namespacing
+
+When sharing Redis across multiple applications, implement key prefixes to avoid collisions:
+
+```python
+# Example: Add prefix to cache keys
+CACHE_PREFIX = "crp:cache:"
+cache_key = f"{CACHE_PREFIX}{func.__name__}:{args_str}"
+```
+
+**Warning**: The `CacheManager.clear()` method currently clears ALL keys in the Redis database. In production with shared Redis, modify this to use pattern matching with your prefix.
 
 ## Troubleshooting
 

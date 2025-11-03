@@ -355,12 +355,19 @@ class CacheManager:
         return False
     
     def clear(self) -> None:
-        """Clear all cache entries."""
+        """
+        Clear all cache entries.
+        
+        Warning: In production environments where Redis is shared with other applications,
+        this will clear ALL keys in the Redis database. Consider using key prefixes
+        and pattern matching (e.g., SCAN with MATCH 'cache:*') to only clear cache keys.
+        """
         # Clear Redis cache (use pattern matching)
         if self.redis_client:
             try:
-                # Note: This clears the entire Redis DB, be careful in production
-                # In production, you might want to use a namespace/prefix
+                # WARNING: This clears the entire Redis DB
+                # In production with shared Redis, use key prefixes/namespaces:
+                # cursor, keys = self.redis_client.scan(cursor, match="cache:*", count=100)
                 cursor = 0
                 while True:
                     cursor, keys = self.redis_client.scan(cursor, count=100)
