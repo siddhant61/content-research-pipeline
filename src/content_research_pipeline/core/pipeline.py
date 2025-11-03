@@ -18,6 +18,8 @@ from ..services.search import search_service
 from ..services.scraper import scraper_service
 from ..services.vector_store import vector_store_service
 from .analysis import analysis_processor
+from ..visualization.charts import chart_generator
+from ..visualization.html_generator import report_generator
 
 logger = get_logger(__name__)
 
@@ -251,8 +253,15 @@ class ContentResearchPipeline:
             VisualizationData containing chart data
         """
         self.logger.info("Executing visualization phase")
-        # Will be implemented in Task 3.1
-        return VisualizationData()
+        
+        # Generate visualization data from analysis
+        if state.analysis:
+            visualization = await chart_generator.generate_visualization_data(state.analysis)
+            self.logger.info("Visualization phase completed")
+            return visualization
+        else:
+            self.logger.warning("No analysis available for visualization")
+            return VisualizationData()
     
     async def _report_generation_phase(
         self, 
@@ -270,5 +279,14 @@ class ContentResearchPipeline:
             HTML report string or None
         """
         self.logger.info("Executing report generation phase")
-        # Will be implemented in Task 3.2
-        return None
+        
+        # Generate HTML report
+        processing_time = time.time() - state.created_at.timestamp()
+        html_report = await report_generator.generate_report(
+            state=state,
+            visualization=visualization,
+            processing_time=processing_time
+        )
+        
+        self.logger.info("Report generation phase completed")
+        return html_report

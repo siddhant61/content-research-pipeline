@@ -2,4 +2,11 @@
 Core package for Content Research Pipeline.
 """
 
-# Will be populated as we create the core modules 
+from .pipeline import ContentResearchPipeline
+from .analysis import AnalysisProcessor, analysis_processor
+
+__all__ = [
+    "ContentResearchPipeline",
+    "AnalysisProcessor",
+    "analysis_processor",
+] 
