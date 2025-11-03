@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     
     # Vector Database Configuration
     chroma_host: str = Field("localhost", env="CHROMA_HOST")
-    chroma_port: int = Field(8000, env="CHROMA_PORT")
+    chroma_port: int = Field(8001, env="CHROMA_PORT")
     
     # FastAPI Configuration
     api_host: str = Field("0.0.0.0", env="API_HOST")

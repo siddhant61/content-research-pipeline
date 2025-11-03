@@ -23,14 +23,6 @@ class TestAPI:
         # Clear jobs before each test
         jobs.clear()
         self.client = TestClient(app)
-        
-        # Mock Redis client to None to use in-memory fallback
-        with patch('src.content_research_pipeline.services.job_store.redis.Redis') as mock_redis:
-            mock_redis.side_effect = Exception("Redis not available")
-        
-        # Ensure API key is not set for tests (optional authentication)
-        with patch('src.content_research_pipeline.config.settings.settings') as mock_settings:
-            mock_settings.api_key = None
     
     def test_root_endpoint(self):
         """Test root endpoint returns correct response."""

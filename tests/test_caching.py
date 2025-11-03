@@ -2,6 +2,7 @@
 Tests for caching utilities with Redis backend.
 """
 
+import pickle
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 

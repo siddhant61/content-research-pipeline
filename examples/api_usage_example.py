@@ -225,12 +225,14 @@ def main():
                 print(f"   Report available at: {report_url}")
             
             # Print summary from results
-            if 'result' in final_status and final_status['result']:
-                result = final_status['result']
-                if 'state' in result and 'analysis' in result['state'] and result['state']['analysis']:
-                    analysis = result['state']['analysis']
-                    if 'summary' in analysis:
-                        print(f"\n   Summary: {analysis['summary'][:200]}...")
+            result = final_status.get('result')
+            if result:
+                state = result.get('state', {})
+                analysis = state.get('analysis')
+                if analysis:
+                    summary = analysis.get('summary', '')
+                    if summary:
+                        print(f"\n   Summary: {summary[:200]}...")
         
         elif final_status['status'] == 'failed':
             print(f"   Error: {final_status.get('error', 'Unknown error')}")
