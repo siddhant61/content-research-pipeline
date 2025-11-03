@@ -23,8 +23,10 @@ To verify your installation:
 
 ```bash
 docker --version
-docker-compose --version
+docker compose version  # or: docker-compose --version (legacy)
 ```
+
+**Note:** This guide uses `docker compose` (Compose V2) commands. If you have the legacy `docker-compose`, replace `docker compose` with `docker-compose` in all commands below.
 
 ## Configuration
 

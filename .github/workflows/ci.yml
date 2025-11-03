@@ -76,9 +76,9 @@ jobs:
         API_KEY=test_api_key_12345
         EOF
     
-    - name: Start services with docker-compose
+    - name: Start services with docker compose
       run: |
-        docker-compose up -d
+        docker compose up -d
     
     - name: Wait for services to be healthy
       run: |
@@ -87,7 +87,7 @@ jobs:
         echo "API is ready!"
         
         echo "Waiting for Redis to be ready..."
-        timeout 60 bash -c 'until docker-compose exec -T redis redis-cli ping | grep PONG; do sleep 2; done'
+        timeout 60 bash -c 'until docker compose exec -T redis redis-cli ping | grep PONG; do sleep 2; done'
         echo "Redis is ready!"
         
         echo "Waiting for ChromaDB to be ready..."
@@ -109,15 +109,15 @@ jobs:
         API_URL: http://localhost:8000
         API_KEY: test_api_key_12345
     
-    - name: Show docker-compose logs on failure
+    - name: Show docker compose logs on failure
       if: failure()
       run: |
-        docker-compose logs
+        docker compose logs
     
-    - name: Stop services with docker-compose
+    - name: Stop services with docker compose
       if: always()
       run: |
-        docker-compose down -v
+        docker compose down -v
 
   security:
     runs-on: ubuntu-latest
