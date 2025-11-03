@@ -22,9 +22,5 @@ RUN curl -sSL https://install.python-poetry.org | python3 - --yes
 # Ensure poetry is on PATH for vscode user
 ENV PATH="/home/vscode/.local/bin:${PATH}"
 
-# Create a convenience script hook (optional)
-COPY postCreate.sh /tmp/postCreate.sh
-RUN chmod +x /tmp/postCreate.sh
-
 # Set default user back to vscode
 USER vscode
