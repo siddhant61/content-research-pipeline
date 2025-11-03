@@ -6,12 +6,13 @@ A comprehensive, AI-powered content research and analysis system that aggregates
 
 - **Multi-Source Content Aggregation**: Search across web, news, images, and videos
 - **AI-Powered Analysis**: Sentiment analysis, topic modeling, and entity extraction
-- **Interactive Visualizations**: Entity relationship graphs, timelines, and word clouds
+- **Source Credibility Assessment**: AI-powered credibility scoring for each source
+- **Interactive Visualizations**: Entity relationship graphs with vis.js, enhanced timelines, and word clouds
 - **Vector Database Storage**: Persistent storage with Chroma for semantic search
 - **Comprehensive Reports**: HTML dashboards and JSON exports
 - **Caching System**: Intelligent caching for improved performance
 - **CLI Interface**: Command-line tools for easy operation
-- **Web API**: RESTful API for integration (optional)
+- **Web API**: RESTful API for background job processing and integration (optional)
 
 ## Installation
 
@@ -109,6 +110,11 @@ Start the web API server:
 python -m content_research_pipeline.cli serve --host 0.0.0.0 --port 8000
 ```
 
+Options:
+- `--host`: Host to bind to (default: 0.0.0.0)
+- `--port`: Port to bind to (default: 8000)
+- `--reload`: Enable auto-reload for development
+
 ### Programmatic Usage
 
 ```python
@@ -131,6 +137,67 @@ import asyncio
 asyncio.run(main())
 ```
 
+### API Usage
+
+The FastAPI server provides RESTful endpoints for background job processing:
+
+#### Start a Research Job
+```bash
+curl -X POST "http://localhost:8000/research" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "climate change impacts", "include_images": true, "include_videos": true}'
+```
+
+Response:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "message": "Research job created successfully. Use /status/{job_id} to check progress."
+}
+```
+
+#### Check Job Status
+```bash
+curl "http://localhost:8000/status/550e8400-e29b-41d4-a716-446655440000"
+```
+
+Response (when completed):
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "query": "climate change impacts",
+  "created_at": "2024-01-01T00:00:00",
+  "completed_at": "2024-01-01T00:05:30",
+  "result": {
+    "state": {...},
+    "visualization": {...},
+    "processing_time": 330.5
+  }
+}
+```
+
+#### List All Jobs
+```bash
+curl "http://localhost:8000/jobs?limit=10&status=completed"
+```
+
+#### Delete a Job
+```bash
+curl -X DELETE "http://localhost:8000/jobs/550e8400-e29b-41d4-a716-446655440000"
+```
+
+### API Endpoints
+
+- `GET /` - API information
+- `GET /health` - Health check
+- `POST /research` - Start a new research job
+- `GET /status/{job_id}` - Get job status and results
+- `GET /jobs` - List all jobs with optional filtering
+- `DELETE /jobs/{job_id}` - Delete a completed or failed job
+```
+
 ## Project Structure
 
 ```
@@ -141,7 +208,8 @@ content_research_pipeline/
 │   ├── config/
 │   │   ├── __init__.py
 │   │   ├── settings.py             # Configuration management
-│   │   └── logging.py              # Logging configuration
+│   │   ├── logging.py              # Logging configuration
+│   │   └── prompts.py              # LLM prompt templates
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── pipeline.py             # Main pipeline orchestration
@@ -214,12 +282,12 @@ The application uses environment variables for configuration. Copy `env.example`
 The system generates comprehensive reports including:
 
 - **Executive Summary**: AI-generated analysis of the research topic
-- **Entity Relationship Graph**: Visual representation of key entities and their relationships
-- **Timeline**: Chronological events related to the topic
+- **Interactive Entity Relationship Graph**: Zoomable, interactive visualization of key entities and their relationships using vis.js
+- **Enhanced Timeline**: Vertical timeline with visual markers, hover effects, and source attribution
 - **Sentiment Analysis**: Overall sentiment and emotional tone
 - **Topic Modeling**: Key themes and topics identified
 - **Word Cloud**: Visual representation of key terms
-- **Source Analysis**: Credibility scores for information sources
+- **Source Credibility Scores**: AI-assessed credibility scores (0.0-1.0) for each information source
 - **Related Queries**: Suggested follow-up research topics
 
 ## Architecture
@@ -228,9 +296,10 @@ The system is built with a modular architecture:
 
 1. **Search Layer**: Aggregates content from multiple sources
 2. **Scraping Layer**: Extracts content from web pages
-3. **Analysis Layer**: Performs AI-powered analysis
+3. **Analysis Layer**: Performs AI-powered analysis with credibility assessment
 4. **Storage Layer**: Manages vector database and caching
-5. **Visualization Layer**: Generates reports and visualizations
+5. **Visualization Layer**: Generates interactive reports and visualizations
+6. **API Layer**: RESTful API for background job processing (optional)
 
 ## Development
 
