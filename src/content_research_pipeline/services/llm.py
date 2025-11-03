@@ -9,6 +9,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from ..config.settings import settings
 from ..config.logging import get_logger
+from ..config import prompts
 
 logger = get_logger(__name__)
 
@@ -45,18 +46,17 @@ class LLMService:
             logger.info("Generating summary")
             
             # Prepare messages
-            system_message = SystemMessage(
-                content="You are an expert at creating concise, informative summaries. "
-                        "Summarize the following content in a clear and comprehensive way."
-            )
+            system_message = SystemMessage(content=prompts.SUMMARY_SYSTEM_PROMPT)
             
             # Truncate text if too long
             if len(text) > 10000:
                 text = text[:10000] + "..."
             
             user_message = HumanMessage(
-                content=f"Please provide a comprehensive summary of the following content "
-                        f"in approximately {max_length} words:\n\n{text}"
+                content=prompts.SUMMARY_USER_PROMPT_TEMPLATE.format(
+                    max_length=max_length,
+                    text=text
+                )
             )
             
             # Generate summary in thread pool
@@ -91,19 +91,14 @@ class LLMService:
             logger.info("Extracting entities with LLM")
             
             # Prepare messages
-            system_message = SystemMessage(
-                content="You are an expert at named entity recognition. "
-                        "Extract key entities from the text and categorize them as "
-                        "PERSON, ORGANIZATION, LOCATION, PRODUCT, EVENT, or OTHER."
-            )
+            system_message = SystemMessage(content=prompts.ENTITY_EXTRACTION_SYSTEM_PROMPT)
             
             # Truncate text if too long
             if len(text) > 8000:
                 text = text[:8000] + "..."
             
             user_message = HumanMessage(
-                content=f"Extract and list all named entities from the following text. "
-                        f"Format each entity as 'Entity Name | Type':\n\n{text}"
+                content=prompts.ENTITY_EXTRACTION_USER_PROMPT_TEMPLATE.format(text=text)
             )
             
             # Extract entities in thread pool
@@ -153,21 +148,14 @@ class LLMService:
             logger.info("Analyzing sentiment")
             
             # Prepare messages
-            system_message = SystemMessage(
-                content="You are an expert at sentiment analysis. "
-                        "Analyze the sentiment of the given text and provide a score."
-            )
+            system_message = SystemMessage(content=prompts.SENTIMENT_ANALYSIS_SYSTEM_PROMPT)
             
             # Truncate text if too long
             if len(text) > 5000:
                 text = text[:5000] + "..."
             
             user_message = HumanMessage(
-                content=f"Analyze the sentiment of the following text. "
-                        f"Respond with only: SENTIMENT | POLARITY | CONFIDENCE\n"
-                        f"where SENTIMENT is positive/negative/neutral, "
-                        f"POLARITY is a number from -1.0 to 1.0, "
-                        f"and CONFIDENCE is a number from 0.0 to 1.0.\n\n{text}"
+                content=prompts.SENTIMENT_ANALYSIS_USER_PROMPT_TEMPLATE.format(text=text)
             )
             
             # Analyze sentiment in thread pool
@@ -226,18 +214,17 @@ class LLMService:
             logger.info(f"Extracting {num_topics} topics")
             
             # Prepare messages
-            system_message = SystemMessage(
-                content="You are an expert at topic extraction. "
-                        "Identify the main topics and themes in the given text."
-            )
+            system_message = SystemMessage(content=prompts.TOPIC_EXTRACTION_SYSTEM_PROMPT)
             
             # Truncate text if too long
             if len(text) > 8000:
                 text = text[:8000] + "..."
             
             user_message = HumanMessage(
-                content=f"Extract the top {num_topics} topics from the following text. "
-                        f"For each topic, provide: Topic Name | Key Words (comma-separated)\n\n{text}"
+                content=prompts.TOPIC_EXTRACTION_USER_PROMPT_TEMPLATE.format(
+                    num_topics=num_topics,
+                    text=text
+                )
             )
             
             # Extract topics in thread pool
@@ -289,19 +276,17 @@ class LLMService:
             logger.info(f"Generating {num_queries} related queries")
             
             # Prepare messages
-            system_message = SystemMessage(
-                content="You are an expert at generating related search queries. "
-                        "Create relevant follow-up queries based on the given content."
-            )
+            system_message = SystemMessage(content=prompts.QUERY_GENERATION_SYSTEM_PROMPT)
             
             # Truncate text if too long
             if len(text) > 5000:
                 text = text[:5000] + "..."
             
             user_message = HumanMessage(
-                content=f"Based on the following content, generate {num_queries} related "
-                        f"search queries that would help explore this topic further. "
-                        f"List only the queries, one per line:\n\n{text}"
+                content=prompts.QUERY_GENERATION_USER_PROMPT_TEMPLATE.format(
+                    num_queries=num_queries,
+                    text=text
+                )
             )
             
             # Generate queries in thread pool
@@ -324,6 +309,62 @@ class LLMService:
         except Exception as e:
             logger.error(f"Failed to generate queries: {e}")
             return []
+    
+    async def assess_credibility(
+        self,
+        title: str,
+        snippet: str,
+        source: str,
+        url: str
+    ) -> float:
+        """
+        Assess the credibility of a search result using LLM.
+        
+        Args:
+            title: Title of the search result
+            snippet: Description/snippet of the result
+            source: Source domain
+            url: Full URL of the result
+            
+        Returns:
+            Credibility score between 0.0 and 1.0
+        """
+        try:
+            logger.info(f"Assessing credibility for: {source}")
+            
+            # Prepare messages
+            system_message = SystemMessage(content=prompts.CREDIBILITY_ASSESSMENT_SYSTEM_PROMPT)
+            
+            user_message = HumanMessage(
+                content=prompts.CREDIBILITY_ASSESSMENT_USER_PROMPT_TEMPLATE.format(
+                    title=title,
+                    snippet=snippet,
+                    source=source,
+                    url=url
+                )
+            )
+            
+            # Get credibility assessment in thread pool
+            response = await asyncio.to_thread(
+                self.llm.invoke,
+                [system_message, user_message]
+            )
+            
+            # Parse response - expecting a float between 0.0 and 1.0
+            try:
+                score = float(response.content.strip())
+                # Ensure score is within valid range
+                score = max(0.0, min(1.0, score))
+            except ValueError:
+                logger.warning(f"Failed to parse credibility score, using default: 0.5")
+                score = 0.5
+            
+            logger.info(f"Credibility score for {source}: {score}")
+            return score
+            
+        except Exception as e:
+            logger.error(f"Failed to assess credibility: {e}")
+            return 0.5  # Default to neutral credibility on error
 
 
 # Global LLM service instance

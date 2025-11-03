@@ -18,7 +18,9 @@ from ..data.models import (
     Topic,
     TimelineEvent,
     RelatedQuery,
-    Relationship
+    Relationship,
+    SearchResult,
+    PipelineState
 )
 from ..services.llm import llm_service
 
@@ -428,6 +430,54 @@ class AnalysisProcessor:
             related_queries=[],
             analyzed_at=datetime.now()
         )
+    
+    async def calculate_credibility(self, state: PipelineState) -> None:
+        """
+        Calculate and populate credibility scores for search results.
+        
+        Args:
+            state: Pipeline state containing search results to assess
+        """
+        logger.info(f"Calculating credibility for {len(state.search_results)} search results")
+        
+        try:
+            # Create tasks to assess credibility for all search results
+            credibility_tasks = []
+            for result in state.search_results:
+                if result.credibility is None:  # Only calculate if not already set
+                    task = llm_service.assess_credibility(
+                        title=result.title,
+                        snippet=result.snippet,
+                        source=result.source,
+                        url=str(result.link)
+                    )
+                    credibility_tasks.append((result, task))
+            
+            if not credibility_tasks:
+                logger.info("All results already have credibility scores")
+                return
+            
+            # Execute all credibility assessments in parallel
+            tasks = [task for _, task in credibility_tasks]
+            credibility_scores = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Assign scores back to results
+            for i, (result, _) in enumerate(credibility_tasks):
+                if not isinstance(credibility_scores[i], Exception):
+                    result.credibility = credibility_scores[i]
+                    logger.debug(f"Credibility for {result.source}: {result.credibility}")
+                else:
+                    logger.warning(f"Failed to calculate credibility for {result.source}: {credibility_scores[i]}")
+                    result.credibility = 0.5  # Default credibility on error
+            
+            logger.info("Credibility calculation completed")
+            
+        except Exception as e:
+            logger.error(f"Credibility calculation failed: {e}")
+            # Set default credibility for all results without scores
+            for result in state.search_results:
+                if result.credibility is None:
+                    result.credibility = 0.5
 
 
 # Global analysis processor instance

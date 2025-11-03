@@ -34,6 +34,8 @@ class ReportGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Content Research Report: {{ state.query }}</title>
+    <!-- Vis.js for interactive graphs -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -159,20 +161,73 @@ class ReportGenerator:
         
         .timeline {
             margin-top: 20px;
+            position: relative;
+            padding-left: 40px;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, #3498db, #2ecc71);
         }
         
         .timeline-item {
-            padding: 15px;
-            margin: 10px 0;
-            background-color: #f8f9fa;
-            border-left: 3px solid #3498db;
-            border-radius: 4px;
+            padding: 20px 25px;
+            margin: 0 0 30px 0;
+            background-color: #ffffff;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .timeline-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -33px;
+            top: 25px;
+            width: 16px;
+            height: 16px;
+            background-color: #3498db;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 0 3px #e8f4f8;
         }
         
         .timeline-date {
             font-weight: bold;
             color: #3498db;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .timeline-date::before {
+            content: '📅';
+            font-size: 1.2em;
+        }
+        
+        .timeline-event {
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .timeline-source {
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #999;
+            font-style: italic;
         }
         
         .related-queries {
@@ -188,7 +243,21 @@ class ReportGenerator:
             border-left: 3px solid #9b59b6;
         }
         
-        .graph-container, .wordcloud-container {
+        .graph-container {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            height: 600px;
+            border: 1px solid #ddd;
+        }
+        
+        #entity-graph {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .wordcloud-container {
             margin: 20px 0;
             padding: 20px;
             background-color: #f8f9fa;
@@ -328,6 +397,16 @@ class ReportGenerator:
             {% endfor %}
         </div>
         
+        <!-- Entity Relationship Graph -->
+        {% if visualization.nodes and visualization.edges %}
+        <div class="section">
+            <h2>Entity Relationship Graph</h2>
+            <div class="graph-container">
+                <div id="entity-graph"></div>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- Word Cloud -->
         {% if visualization.word_cloud %}
         <div class="section">
@@ -346,7 +425,8 @@ class ReportGenerator:
                 {% for event in state.analysis.timeline[:10] %}
                 <div class="timeline-item">
                     <div class="timeline-date">{{ event.date }}</div>
-                    <div>{{ event.event }}</div>
+                    <div class="timeline-event">{{ event.event }}</div>
+                    <div class="timeline-source">Source: {{ event.source }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -388,6 +468,89 @@ class ReportGenerator:
             <p>© {{ state.created_at.year }} - All Rights Reserved</p>
         </div>
     </div>
+    
+    <!-- JavaScript for Interactive Graph -->
+    {% if visualization.nodes and visualization.edges %}
+    <script type="text/javascript">
+        // Prepare data for vis.js
+        var nodes = new vis.DataSet({{ visualization.nodes | tojson }});
+        var edges = new vis.DataSet({{ visualization.edges | tojson }});
+        
+        // Create network
+        var container = document.getElementById('entity-graph');
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+        
+        var options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    size: 14,
+                    color: '#333'
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                width: 2,
+                color: {
+                    color: '#848484',
+                    highlight: '#3498db',
+                    hover: '#3498db'
+                },
+                smooth: {
+                    type: 'continuous',
+                    roundness: 0.5
+                },
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.5
+                    }
+                },
+                shadow: true
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -8000,
+                    centralGravity: 0.3,
+                    springLength: 150,
+                    springConstant: 0.04,
+                    damping: 0.09,
+                    avoidOverlap: 0.1
+                },
+                stabilization: {
+                    iterations: 100
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                navigationButtons: true,
+                keyboard: true,
+                zoomView: true,
+                dragView: true
+            }
+        };
+        
+        var network = new vis.Network(container, data, options);
+        
+        // Add click event to show node details
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                var nodeId = params.nodes[0];
+                var node = nodes.get(nodeId);
+                if (node) {
+                    alert('Entity: ' + node.label + '\nType: ' + (node.title || 'Unknown'));
+                }
+            }
+        });
+    </script>
+    {% endif %}
 </body>
 </html>
         """
