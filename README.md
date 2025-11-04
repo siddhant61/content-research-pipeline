@@ -13,6 +13,67 @@ A comprehensive, AI-powered content research and analysis system that aggregates
 - **Caching System**: Intelligent caching for improved performance
 - **CLI Interface**: Command-line tools for easy operation
 - **Web API**: RESTful API for background job processing and integration (optional)
+- **Web UI**: Modern, responsive web interface for easy interaction
+
+## Web UI
+
+The Content Research Pipeline includes a beautiful, user-friendly web interface that allows you to perform research without writing any code.
+
+### Main Interface
+
+![Main Interface](https://github.com/user-attachments/assets/1c7440d0-2447-4f32-b4d7-740071d71f8e)
+
+The main interface features:
+- Large text input for research queries
+- Toggle options for images, videos, and news
+- Real-time job status tracking with progress indicators
+
+### Settings Modal
+
+![Settings Modal](https://github.com/user-attachments/assets/983c9cd1-d283-49d8-8d8b-2747b951b256)
+
+Configure your API keys directly in the browser:
+- OpenAI API Key for AI analysis
+- Google API Key and CSE ID for search functionality
+- Optional Pipeline API Key for authentication
+- Keys are securely stored in browser's localStorage
+
+### Job Status Tracking
+
+![Job Running](https://github.com/user-attachments/assets/e3bd3dc7-720b-4290-a4a2-f063f8750387)
+
+Monitor your research job in real-time with:
+- Live status updates (pending, running, completed, failed)
+- Progress bar visualization
+- Job ID for reference
+
+![Job Completed](https://github.com/user-attachments/assets/72bcc73d-22a5-441d-8963-7b478f2106f5)
+
+When complete, access your comprehensive research report with a single click.
+
+### Accessing the Web UI
+
+#### Option 1: Using Docker Compose (Recommended)
+
+```bash
+# Start all services including the UI
+docker-compose up
+
+# Access the UI at http://localhost:8000
+```
+
+#### Option 2: Running Locally
+
+```bash
+# Start the API server (includes UI)
+python -m content_research_pipeline.cli serve --host 0.0.0.0 --port 8000
+
+# Access the UI at http://localhost:8000
+```
+
+#### Option 3: GitHub Codespaces (One-Click Demo)
+
+Click the "Code" button on GitHub and select "Create codespace on main" for an instant, pre-configured development environment with the UI ready to use.
 
 ## Installation
 
