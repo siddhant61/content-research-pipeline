@@ -4,7 +4,6 @@
 # To make this agent available, merge this file into the default repository branch.
 # For format details, see: https://gh.io/customagents/config
 
----
 name: content-research-specialist
 description: Specializes in auditing, stabilizing, and aligning the content-research-pipeline around shared artifact contracts and the canonical JWST research flow.
 target: github-copilot
