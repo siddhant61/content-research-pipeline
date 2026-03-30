@@ -1,0 +1,69 @@
+{
+  "artifact_type": "NormalizedDocumentSet",
+  "schema_version": "1.0.0",
+  "artifact_id": "jwst-demo-nds-001",
+  "created_at": "2026-03-30T00:00:00Z",
+  "producer": "material-ingestion-pipeline",
+  "source_run_id": "ingest-run-001",
+  "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
+  "documents": [
+    {
+      "document_id": "doc-overview",
+      "source_id": "jwst-nasa-mission-overview",
+      "title": "NASA Webb Mission Overview",
+      "document_type": "webpage",
+      "language": "en",
+      "text": "The James Webb Space Telescope (JWST) is the largest and most powerful space telescope ever built. It was launched on December 25, 2021, and observes the universe primarily in infrared light. Webb is designed to answer outstanding questions about the Universe and to make breakthrough discoveries in all fields of astronomy.",
+      "sections": [
+        {
+          "section_id": "sec-overview-intro",
+          "heading": "Mission Overview",
+          "text": "The James Webb Space Telescope (JWST) is the largest and most powerful space telescope ever built.",
+          "order_index": 0,
+          "page_start": null,
+          "page_end": null,
+          "time_start": null,
+          "time_end": null
+        }
+      ],
+      "metadata": {
+        "word_count": 52,
+        "normalized_at": "2026-03-30T01:00:00Z"
+      }
+    },
+    {
+      "document_id": "doc-factsheet",
+      "source_id": "jwst-nasa-fact-sheet",
+      "title": "NASA Webb Fact Sheet",
+      "document_type": "webpage",
+      "language": "en",
+      "text": "Webb's primary mirror is 6.5 meters in diameter, made of 18 gold-coated beryllium segments. The sunshield is the size of a tennis court and has five layers. Webb orbits the Sun at the second Lagrange point (L2), approximately 1.5 million kilometers from Earth.",
+      "sections": [
+        {
+          "section_id": "sec-factsheet-mirror",
+          "heading": "Primary Mirror",
+          "text": "Webb's primary mirror is 6.5 meters in diameter, made of 18 gold-coated beryllium segments.",
+          "order_index": 0,
+          "page_start": null,
+          "page_end": null,
+          "time_start": null,
+          "time_end": null
+        },
+        {
+          "section_id": "sec-factsheet-sunshield",
+          "heading": "Sunshield",
+          "text": "The sunshield is the size of a tennis court and has five layers.",
+          "order_index": 1,
+          "page_start": null,
+          "page_end": null,
+          "time_start": null,
+          "time_end": null
+        }
+      ],
+      "metadata": {
+        "word_count": 44,
+        "normalized_at": "2026-03-30T01:00:00Z"
+      }
+    }
+  ]
+}
