@@ -82,12 +82,20 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run Phase 1 tests (models, generator, validator)
-pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py -v
+# Run Phase 1 tests (models, generator, validator, demo contract)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py -v
 
-# Run all tests
+# Run all working tests (Phase 1 + config + prompts)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_config.py tests/test_prompts.py -v
+
+# Run all tests (requires full dependencies from requirements.txt)
 pytest tests/
 ```
+
+### Audit
+
+See [AUDIT.md](AUDIT.md) for the full Phase 1 audit package covering entrypoints,
+contract alignment, happy-path status, broken paths, and implementation plan.
 
 ## Artifacts This Repo Owns
 
