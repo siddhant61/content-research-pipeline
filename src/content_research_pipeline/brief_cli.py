@@ -15,6 +15,11 @@ Usage:
         --graph path/to/KnowledgeGraphPackage.json \\
         --output-dir output/
 
+    # From a fixture directory (Phase 2A — recommended)
+    python -m content_research_pipeline.brief_cli generate \\
+        --fixture-dir demo_data/jwst_star_formation_early_universe_demo/ \\
+        --output-dir output/
+
     # Validate
     python -m content_research_pipeline.brief_cli validate \\
         --brief output/jwst_star_formation_early_universe_demo__ResearchBrief__*.json
@@ -32,6 +37,7 @@ from .core.brief_generator import (
     generate_brief_from_manifest,
     load_raw_source_bundle,
 )
+from .core.fixture_loader import load_upstream_fixtures
 from .utils.contract_validator import (
     validate_brief_file,
     validate_manifest_file,
@@ -41,7 +47,7 @@ from .utils.contract_validator import (
 
 
 @click.group()
-@click.version_option(version="1.5.0")
+@click.version_option(version="2.0.0")
 def brief_cli():
     """Content Research Pipeline — brief generation and validation."""
     pass
@@ -78,25 +84,58 @@ def brief_cli():
     help="Optional path to a KnowledgeGraphPackage JSON.",
 )
 @click.option(
+    "--fixture-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False),
+    help="Path to a fixture directory containing upstream artifacts. "
+         "Auto-discovers KnowledgeGraphPackage, NormalizedDocumentSet, "
+         "and RawSourceBundle from well-known filenames.",
+)
+@click.option(
     "--output-dir", "-o",
     default="output",
     type=click.Path(),
     help="Directory to write output files (default: output/).",
 )
-def generate(manifest, question, documents, chunks, graph, output_dir):
+def generate(manifest, question, documents, chunks, graph, fixture_dir, output_dir):
     """Generate a ResearchBrief from upstream artifacts.
 
-    At least one of --manifest, --documents, or --graph must be provided.
+    Provide --fixture-dir to auto-discover all upstream artifacts in a
+    directory, or supply individual artifact paths via --manifest,
+    --documents, and/or --graph.
 
     Input priority:
       1. KnowledgeGraphPackage (--graph)  — richest structured input
       2. NormalizedDocumentSet (--documents) — document-level content
       3. RawSourceBundle (--manifest) — source metadata / seed entities
     """
+    # If --fixture-dir is given, discover and load upstream artifacts
+    if fixture_dir:
+        fixtures = load_upstream_fixtures(fixture_dir)
+        if not fixtures.has_any:
+            click.echo(
+                f"Error: no upstream artifacts found in {fixture_dir}",
+                err=True,
+            )
+            sys.exit(1)
+        click.echo(f"Discovered fixtures in {fixture_dir}:")
+        if fixtures.graph_path:
+            # Explicit CLI args take precedence over auto-discovered fixtures
+            graph = graph or fixtures.graph_path
+            click.echo(f"  KnowledgeGraphPackage: {fixtures.graph_path}")
+        if fixtures.documents_path:
+            documents = documents or fixtures.documents_path
+            click.echo(f"  NormalizedDocumentSet: {fixtures.documents_path}")
+        if fixtures.bundle_path:
+            manifest = manifest or fixtures.bundle_path
+            click.echo(f"  RawSourceBundle:       {fixtures.bundle_path}")
+        for warning in fixtures.warnings:
+            click.echo(f"  ⚠ {warning}")
+
     if not manifest and not documents and not graph:
         click.echo(
-            "Error: at least one of --manifest, --documents, or --graph "
-            "must be provided.",
+            "Error: at least one of --manifest, --documents, --graph, or "
+            "--fixture-dir must be provided.",
             err=True,
         )
         sys.exit(1)
