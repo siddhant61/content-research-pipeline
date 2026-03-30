@@ -269,11 +269,23 @@ Ranked by impact-to-effort ratio:
 
 ## Appendix: Test Results Summary
 
-### Phase 1 Tests (35/35 passing)
+### Phase 1 Tests (47/47 passing)
 ```
-tests/test_artifacts.py       — 8 passed
-tests/test_brief_generator.py — 12 passed
-tests/test_contract_validator.py — 15 passed
+tests/test_artifacts.py           — 8 passed
+tests/test_brief_generator.py     — 12 passed
+tests/test_contract_validator.py  — 15 passed
+tests/test_demo_contract.py       — 12 passed
+```
+
+### Phase 1.5 Tests (44/44 passing)
+```
+tests/test_upstream_artifacts.py  — 44 passed
+  TestKGDrivenBrief               — 10 tests (KG-only brief, entities, findings, attribution, contract)
+  TestNDSDrivenBrief              — 7 tests (NDS-only brief, entities, findings, attribution, contract)
+  TestFallbackBehavior            — 9 tests (priority chain, topic resolution, source merging)
+  TestContractOutput              — 6 tests (all input combos produce valid output)
+  TestGenerateBriefFromArtifacts  — 7 tests (convenience function, file I/O, contract)
+  TestDemoFixtureContract         — 5 tests (demo KG/NDS fixture validation)
 ```
 
 ### Working Legacy Tests (18/18 passing)
@@ -300,3 +312,94 @@ tests/test_scraper.py         — ModuleNotFoundError: trafilatura
 1 test FAILED (report with analysis)
 3 tests PASSED
 ```
+
+---
+
+## Phase 1.5 Worklog
+
+**Date:** 2026-03-30
+**Scope:** Upstream artifact consumption — KG/NDS-driven ResearchBrief generation
+
+### What changed
+
+| Component | Change | Why |
+|-----------|--------|-----|
+| `core/brief_generator.py` | `BriefGenerator.bundle` is now `Optional`; added `_resolve_topic()`, `_resolve_source_index()`, `_resolve_citation_map()`, `_resolve_entities()`, `_resolve_findings()` methods | Enables KG-only and NDS-only brief generation |
+| `core/brief_generator.py` | New functions: `_build_source_index_from_graph()`, `_build_source_index_from_documents()`, `_build_citation_map_from_graph()`, `_build_citation_map_from_documents()`, `_build_entities_from_documents()`, `_build_findings_from_graph()` | Source attribution and content extraction from non-bundle artifacts |
+| `core/brief_generator.py` | New `generate_brief_from_artifacts()` convenience function | Flexible entry point that accepts any combination of upstream artifacts |
+| `brief_cli.py` | `--manifest` is no longer required; CLI requires at least one of `--manifest`, `--documents`, `--graph` | Enables KG-first or NDS-first workflows |
+| `brief_cli.py` | Version bumped to 1.5.0 | Reflects new capability |
+| Demo fixtures | Added `KnowledgeGraphPackage.sample.json` and `NormalizedDocumentSet.sample.json` | Canonical upstream artifact samples for testing |
+| Tests | Added `tests/test_upstream_artifacts.py` (44 tests) | KG-driven, NDS-driven, fallback, and contract validation coverage |
+| `README.md` | Updated for Phase 1.5: input priority table, new quick start examples, contract field notes, seed_entities documented as extension | Documentation accuracy |
+| `AUDIT.md` | Added Phase 1.5 worklog section | Audit trail |
+
+### Input priority (defined and tested)
+
+1. **KnowledgeGraphPackage** — entities from `nodes`, findings from `edges` + node descriptions
+2. **NormalizedDocumentSet** — entities from document titles, findings from document `text`
+3. **RawSourceBundle** — entities from `seed_entities` (internal extension), placeholder findings
+
+Source attribution merges across all available artifacts: `bundle > documents > graph`.
+
+### `seed_entities` — documented as internal extension
+
+The `seed_entities` field on `RawSourceBundle` is **not** defined in `contracts/shared_artifacts.json`
+`required_fields`.  It is used only as a fallback when no richer upstream artifact is available.
+It is now explicitly documented in `_build_entities_from_seeds()` and in `README.md`.
+
+### Optional-vs-required field mismatches (documented)
+
+| Field | Artifact | Contract says | Model says | Impact |
+|-------|----------|---------------|------------|--------|
+| `retrieved_at` | `RawSourceItem` | Required in `source_item_required_fields` | `Optional[str]` | Demo uses `null`; real ingestion should populate |
+| `checksum` | `RawSourceItem` | Required in `source_item_required_fields` | `Optional[str]` | Demo uses `null`; real ingestion should populate |
+| `embeddings_index` | `KnowledgeGraphPackage` | Required in `required_fields` | `Optional[str]` | May be `null` before embedding computation |
+| `entities` sub-fields | `ResearchBrief` | Not defined in contract | `List[Dict[str, Any]]` | Loosely typed; downstream should not assume sub-schema |
+| `seed_entities` | `RawSourceBundle` | Not in `required_fields` | `Optional[List[str]]` | Internal extension, not a contract obligation |
+| `status`, `notes` | `RawSourceBundle` | Not in `required_fields` | `Optional` | Informational extensions in demo scaffold |
+
+### Validated commands
+
+```bash
+# KG-only generation
+python -m content_research_pipeline.brief_cli generate \
+    --graph demo_data/jwst_star_formation_early_universe_demo/KnowledgeGraphPackage.sample.json \
+    --output-dir output/
+
+# NDS-only generation
+python -m content_research_pipeline.brief_cli generate \
+    --documents demo_data/jwst_star_formation_early_universe_demo/NormalizedDocumentSet.sample.json \
+    --output-dir output/
+
+# Manifest-only (Phase 1 path, still supported)
+python -m content_research_pipeline.brief_cli generate \
+    --manifest demo_data/jwst_star_formation_early_universe_demo/manifest.json \
+    --output-dir output/
+
+# All artifacts combined
+python -m content_research_pipeline.brief_cli generate \
+    --manifest demo_data/jwst_star_formation_early_universe_demo/manifest.json \
+    --documents demo_data/jwst_star_formation_early_universe_demo/NormalizedDocumentSet.sample.json \
+    --graph demo_data/jwst_star_formation_early_universe_demo/KnowledgeGraphPackage.sample.json \
+    --output-dir output/
+
+# Tests
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py \
+    tests/test_demo_contract.py tests/test_upstream_artifacts.py -v --no-cov
+```
+
+### Cross-repo implications
+
+| For | Implication |
+|-----|-------------|
+| material-ingestion-pipeline | This repo now actively consumes `KnowledgeGraphPackage` and `NormalizedDocumentSet`. Ingestion should produce these in the contract-defined shape. |
+| media-generation-pipeline | No changes to `ResearchBrief` shape. Output remains contract-compliant regardless of input source. |
+| Contract | `seed_entities` is used but not required. No contract changes needed. |
+
+### What remains
+
+- ChunkSet is accepted but not yet used for synthesis (could enable chunk-level evidence retrieval)
+- LLM-powered synthesis for richer `executive_summary` and `key_findings`
+- API endpoint for brief generation (`POST /brief`)
+- Legacy pipeline bridge to emit `ResearchBrief` alongside `PipelineResult`

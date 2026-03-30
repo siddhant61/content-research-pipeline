@@ -1,11 +1,21 @@
 """
-Standalone CLI for Phase 1 happy path: generate a ResearchBrief from a manifest.
+Standalone CLI for the Content Research Pipeline.
+
+Generate a ResearchBrief from upstream artifacts (KnowledgeGraphPackage,
+NormalizedDocumentSet, and/or RawSourceBundle manifest).
 
 Usage:
+    # From manifest (Phase 1 path)
     python -m content_research_pipeline.brief_cli generate \\
         --manifest demo_data/jwst_star_formation_early_universe_demo/manifest.json \\
         --output-dir output/
 
+    # From a KnowledgeGraphPackage (Phase 1.5 — preferred)
+    python -m content_research_pipeline.brief_cli generate \\
+        --graph path/to/KnowledgeGraphPackage.json \\
+        --output-dir output/
+
+    # Validate
     python -m content_research_pipeline.brief_cli validate \\
         --brief output/jwst_star_formation_early_universe_demo__ResearchBrief__*.json
 """
@@ -18,6 +28,7 @@ import click
 
 from .core.brief_generator import (
     BriefGenerator,
+    generate_brief_from_artifacts,
     generate_brief_from_manifest,
     load_raw_source_bundle,
 )
@@ -30,16 +41,16 @@ from .utils.contract_validator import (
 
 
 @click.group()
-@click.version_option(version="1.0.0")
+@click.version_option(version="1.5.0")
 def brief_cli():
-    """Content Research Pipeline — Phase 1 brief generation and validation."""
+    """Content Research Pipeline — brief generation and validation."""
     pass
 
 
 @brief_cli.command()
 @click.option(
     "--manifest", "-m",
-    required=True,
+    default=None,
     type=click.Path(exists=True),
     help="Path to a RawSourceBundle JSON (e.g. demo manifest.json).",
 )
@@ -73,10 +84,33 @@ def brief_cli():
     help="Directory to write output files (default: output/).",
 )
 def generate(manifest, question, documents, chunks, graph, output_dir):
-    """Generate a ResearchBrief from upstream artifacts."""
-    click.echo(f"Loading manifest: {manifest}")
+    """Generate a ResearchBrief from upstream artifacts.
 
-    result = generate_brief_from_manifest(
+    At least one of --manifest, --documents, or --graph must be provided.
+
+    Input priority:
+      1. KnowledgeGraphPackage (--graph)  — richest structured input
+      2. NormalizedDocumentSet (--documents) — document-level content
+      3. RawSourceBundle (--manifest) — source metadata / seed entities
+    """
+    if not manifest and not documents and not graph:
+        click.echo(
+            "Error: at least one of --manifest, --documents, or --graph "
+            "must be provided.",
+            err=True,
+        )
+        sys.exit(1)
+
+    inputs = []
+    if manifest:
+        inputs.append(f"manifest: {manifest}")
+    if documents:
+        inputs.append(f"documents: {documents}")
+    if graph:
+        inputs.append(f"graph: {graph}")
+    click.echo(f"Loading inputs: {', '.join(inputs)}")
+
+    result = generate_brief_from_artifacts(
         manifest_path=manifest,
         research_question=question,
         documents_path=documents,
