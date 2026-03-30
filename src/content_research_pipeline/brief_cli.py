@@ -120,6 +120,7 @@ def generate(manifest, question, documents, chunks, graph, fixture_dir, output_d
             sys.exit(1)
         click.echo(f"Discovered fixtures in {fixture_dir}:")
         if fixtures.graph_path:
+            # Explicit CLI args take precedence over auto-discovered fixtures
             graph = graph or fixtures.graph_path
             click.echo(f"  KnowledgeGraphPackage: {fixtures.graph_path}")
         if fixtures.documents_path:

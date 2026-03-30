@@ -249,8 +249,10 @@ class TestNDSFallbackIntegration:
         brief = gen.generate()
 
         assert len(brief.key_findings) == 2
-        assert any("NASA Webb Mission Overview" in f.claim for f in brief.key_findings)
-        assert any("NASA Webb Fact Sheet" in f.claim for f in brief.key_findings)
+        # Findings from NDS should reference the source_ids of the documents
+        evidence_refs = {ref for f in brief.key_findings for ref in f.evidence_refs}
+        assert "jwst-nasa-mission-overview" in evidence_refs
+        assert "jwst-nasa-fact-sheet" in evidence_refs
 
     def test_nds_fixture_source_ids_preserved(self):
         fixtures = load_upstream_fixtures(str(DEMO_DIR))
