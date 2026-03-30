@@ -601,6 +601,20 @@ class BriefGenerator:
         elif self.graph:
             source_count = len(self.graph.nodes)
 
+        # Collect upstream provenance metadata when available
+        upstream_provenance: Dict[str, Any] = {}
+        if self.graph:
+            upstream_provenance["graph_producer"] = self.graph.producer
+            upstream_provenance["graph_source_run_id"] = self.graph.source_run_id
+            if self.graph.provenance:
+                upstream_provenance["graph_provenance"] = self.graph.provenance
+        if self.documents:
+            upstream_provenance["documents_producer"] = self.documents.producer
+            upstream_provenance["documents_source_run_id"] = self.documents.source_run_id
+        if self.bundle:
+            upstream_provenance["bundle_producer"] = self.bundle.producer
+            upstream_provenance["bundle_source_run_id"] = self.bundle.source_run_id
+
         return RunManifest(
             artifact_id=_make_id("manifest"),
             created_at=_now_iso(),
@@ -613,6 +627,7 @@ class BriefGenerator:
                 "documents": self.documents.artifact_id if self.documents else None,
                 "chunks": self.chunks.artifact_id if self.chunks else None,
                 "graph": self.graph.artifact_id if self.graph else None,
+                "upstream_provenance": upstream_provenance if upstream_provenance else None,
             },
             outputs=outputs,
             metrics={

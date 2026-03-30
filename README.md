@@ -22,6 +22,57 @@ All three repos share a versioned artifact contract:
 - **Schema documentation**: `contracts/schemas.md`
 - **Demo manifest**: `contracts/demo_manifest.md`
 
+## Phase 2A — Upstream Fixture Consumption
+
+Phase 2A adds a stable fixture-based integration path for consuming real
+upstream artifacts from `material-ingestion-pipeline`.
+
+### Fixture Directory Loading
+
+The new `--fixture-dir` CLI option auto-discovers all upstream artifacts
+in a directory using well-known filenames:
+
+```bash
+# Recommended: load all upstream artifacts from a fixture directory
+python -m content_research_pipeline.brief_cli generate \
+    --fixture-dir demo_data/jwst_star_formation_early_universe_demo/ \
+    --output-dir output/
+```
+
+The loader looks for:
+| Filename | Artifact |
+|----------|----------|
+| `KnowledgeGraphPackage.sample.json` or `KnowledgeGraphPackage.json` | KnowledgeGraphPackage |
+| `NormalizedDocumentSet.sample.json` or `NormalizedDocumentSet.json` | NormalizedDocumentSet |
+| `manifest.json` or `RawSourceBundle.json` | RawSourceBundle |
+
+### Provenance Preservation
+
+When upstream artifacts are consumed, the `RunManifest.inputs.upstream_provenance`
+field captures:
+- Producer pipeline name and run ID for each artifact
+- Full `provenance` dict from `KnowledgeGraphPackage` (pipeline, stage, source_artifact)
+
+### Citation Enrichment
+
+Source attribution is merged across all available artifacts.  When both a
+`KnowledgeGraphPackage` and `RawSourceBundle` are provided:
+- Source entries from the bundle provide rich metadata (org, URL, license)
+- KG-only source entries are supplemented with bundle data where source_ids match
+
+### Field Degradations (KG-Only Path)
+
+When a `KnowledgeGraphPackage` is consumed without a `RawSourceBundle`:
+| Field | Value | Reason |
+|-------|-------|--------|
+| `source_index[].origin_org` | `"unknown"` | KG source_refs lack org metadata |
+| `source_index[].url` | `""` | KG source_refs lack URL metadata |
+| `citation_map[].origin_org` | `"unknown"` | Same as above |
+| `citation_map[].url` | `""` | Same as above |
+| `citation_map[].license` | `"unknown"` | Same as above |
+
+These degradations are fully resolved when a `RawSourceBundle` is also provided.
+
 ## Phase 1.5 — Upstream Artifact Consumption
 
 The generator accepts any combination of upstream ingestion artifacts and applies
@@ -40,7 +91,12 @@ is **merged** across all available artifacts so provenance is never lost.
 # Install core dependencies
 pip install pydantic pydantic-settings click
 
-# Generate from a KnowledgeGraphPackage (preferred path)
+# Recommended: generate from a fixture directory (Phase 2A)
+python -m content_research_pipeline.brief_cli generate \
+    --fixture-dir demo_data/jwst_star_formation_early_universe_demo/ \
+    --output-dir output/
+
+# Generate from a KnowledgeGraphPackage (Phase 1.5 path)
 python -m content_research_pipeline.brief_cli generate \
     --graph demo_data/jwst_star_formation_early_universe_demo/KnowledgeGraphPackage.sample.json \
     --output-dir output/
@@ -96,11 +152,11 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 tests (models, generator, validator, demo contract, upstream artifacts)
-pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py -v
+# Run all Phase 1 + 1.5 + 2A tests (models, generator, validator, demo, upstream, fixture integration)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py -v
 
-# Run all working tests (Phase 1/1.5 + config + prompts)
-pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_config.py tests/test_prompts.py -v
+# Run all working tests (Phase 1/1.5/2A + config + prompts)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_config.py tests/test_prompts.py -v
 
 # Run all tests (requires full dependencies from requirements.txt)
 pytest tests/
@@ -115,8 +171,8 @@ contract alignment, happy-path status, contract field analysis, and implementati
 
 | Artifact | Status |
 |----------|--------|
-| `ResearchBrief` | ✓ Implemented (Phase 1.5) |
-| `RunManifest` (research runs) | ✓ Implemented (Phase 1.5) |
+| `ResearchBrief` | ✓ Implemented (Phase 1.5 + 2A enrichment) |
+| `RunManifest` (research runs) | ✓ Implemented (Phase 1.5 + 2A provenance) |
 
 ## Artifacts This Repo Consumes
 
@@ -157,6 +213,7 @@ content-research-pipeline/
 │   │   └── models.py              # Legacy pipeline models
 │   ├── core/
 │   │   ├── brief_generator.py     # ResearchBrief generation from artifacts
+│   │   ├── fixture_loader.py      # Upstream fixture discovery and loading (Phase 2A)
 │   │   ├── pipeline.py            # Legacy web search pipeline
 │   │   └── analysis.py            # NLP analysis module
 │   ├── utils/
@@ -182,6 +239,7 @@ content-research-pipeline/
 │   ├── test_artifacts.py          # Artifact model tests
 │   ├── test_brief_generator.py    # Brief generation tests (Phase 1)
 │   ├── test_upstream_artifacts.py # Upstream artifact tests (Phase 1.5)
+│   ├── test_fixture_integration.py # Fixture-based integration tests (Phase 2A)
 │   ├── test_contract_validator.py # Validation tests
 │   ├── test_demo_contract.py      # Demo fixture contract tests
 │   └── ...                        # Legacy pipeline tests
