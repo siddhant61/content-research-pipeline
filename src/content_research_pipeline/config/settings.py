@@ -3,7 +3,11 @@ Configuration management for the Content Research Pipeline.
 """
 
 from typing import Optional
-from pydantic import BaseSettings, Field, validator
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
+from pydantic import Field, validator
 from pathlib import Path
 import os
 
@@ -12,9 +16,9 @@ class Settings(BaseSettings):
     """Application settings with environment variable support."""
     
     # API Keys
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    google_api_key: str = Field(..., env="GOOGLE_API_KEY")
-    google_cse_id: str = Field(..., env="GOOGLE_CSE_ID")
+    openai_api_key: str = Field("", env="OPENAI_API_KEY")
+    google_api_key: str = Field("", env="GOOGLE_API_KEY")
+    google_cse_id: str = Field("", env="GOOGLE_CSE_ID")
     
     # Application Configuration
     log_level: str = Field("INFO", env="LOG_LEVEL")
