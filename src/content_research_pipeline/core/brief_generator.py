@@ -209,6 +209,11 @@ def _build_entities_from_seeds(
 ) -> List[Dict[str, Any]]:
     """Build entity list from seed entities.
 
+    Args:
+        seed_entities: Labels for seed entities (internal extension of
+            RawSourceBundle — NOT part of the formal shared contract).
+        source_ids: List of source identifiers to use for entity source_refs.
+
     Note: ``seed_entities`` is an *internal extension* of the RawSourceBundle —
     it is NOT part of the formal shared contract (contracts/shared_artifacts.json).
     It is used here only as a convenience when no richer upstream artifact is
@@ -542,9 +547,8 @@ class BriefGenerator:
         ]
 
         # Recommended angles
-        first_entity = entity_labels[0] if entity_labels else None
         recommended_angles = [
-            f"Deep dive into {first_entity}" if first_entity else "Broad topic overview",
+            f"Deep dive into {entity_labels[0]}" if entity_labels else "Broad topic overview",
             "Source credibility comparison across organizations",
             "Timeline of key milestones and discoveries",
         ]

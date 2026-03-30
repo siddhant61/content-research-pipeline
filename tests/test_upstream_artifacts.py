@@ -386,13 +386,20 @@ class TestFallbackBehavior:
     def test_topic_priority_graph(self):
         """Topic should come from graph when available."""
         bundle = _make_bundle()
-        graph = _make_graph()
-        graph_topic = "Graph Topic Override"
-        graph.topic = graph_topic  # type: ignore[assignment]
+        graph = KnowledgeGraphPackage(
+            artifact_id="graph-topic-test",
+            created_at="2026-01-01T00:00:00Z",
+            producer="test",
+            source_run_id="run-test",
+            topic="Graph Topic Override",
+            graph_name="test-graph",
+            nodes=[],
+            edges=[],
+            provenance={},
+        )
         gen = BriefGenerator(bundle=bundle, graph=graph)
         brief = gen.generate()
-        # Graph topic takes priority but topic comes from _resolve_topic
-        assert brief.topic == graph_topic
+        assert brief.topic == "Graph Topic Override"
 
     def test_topic_priority_nds(self):
         """Topic should come from NDS when no graph is available."""
