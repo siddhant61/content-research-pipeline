@@ -59,6 +59,7 @@ setup(
     entry_points={
         "console_scripts": [
             "content-research=content_research_pipeline.cli:cli",
+            "content-research-brief=content_research_pipeline.brief_cli:brief_cli",
         ],
     },
     include_package_data=True,

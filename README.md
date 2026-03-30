@@ -1,447 +1,193 @@
 # Content Research Pipeline
 
-A comprehensive, AI-powered content research and analysis system that aggregates information from multiple sources, performs intelligent analysis, and generates detailed reports with visualizations.
+**Research and enrichment layer** of a 3-part AI workflow stack.
 
-## Features
+This repository consumes structured upstream artifacts from the [material-ingestion-pipeline](https://github.com/siddhant61/material-ingestion-pipeline) and produces a contract-compliant **ResearchBrief** for downstream [media-generation-pipeline](https://github.com/siddhant61/media-generation-pipeline).
 
-- **Multi-Source Content Aggregation**: Search across web, news, images, and videos
-- **AI-Powered Analysis**: Sentiment analysis, topic modeling, and entity extraction
-- **Source Credibility Assessment**: AI-powered credibility scoring for each source
-- **Interactive Visualizations**: Entity relationship graphs with vis.js, enhanced timelines, and word clouds
-- **Vector Database Storage**: Persistent storage with Chroma for semantic search
-- **Comprehensive Reports**: HTML dashboards and JSON exports
-- **Caching System**: Intelligent caching for improved performance
-- **CLI Interface**: Command-line tools for easy operation
-- **Web API**: RESTful API for background job processing and integration (optional)
-- **Web UI**: Modern, responsive web interface for easy interaction
+## Cross-Repo Architecture
 
-## Web UI
+```
+material-ingestion-pipeline          content-research-pipeline          media-generation-pipeline
+────────────────────────────         ─────────────────────────          ──────────────────────────
+RawSourceBundle ──────────────┐
+NormalizedDocumentSet ────────┤
+ChunkSet ─────────────────────┼──▶  ResearchBrief ──────────────────▶  ScenePlan
+KnowledgeGraphPackage ────────┘     RunManifest                        MediaPackage
+```
 
-The Content Research Pipeline includes a beautiful, user-friendly web interface that allows you to perform research without writing any code.
+### Shared Contracts
 
-### Main Interface
+All three repos share a versioned artifact contract:
+- **Contract definition**: `contracts/shared_artifacts.json` (v1.0.0)
+- **Schema documentation**: `contracts/schemas.md`
+- **Demo manifest**: `contracts/demo_manifest.md`
 
-![Main Interface](https://github.com/user-attachments/assets/1c7440d0-2447-4f32-b4d7-740071d71f8e)
+## Phase 1 — Happy Path
 
-The main interface features:
-- Large text input for research queries
-- Toggle options for images, videos, and news
-- Real-time job status tracking with progress indicators
+The Phase 1 happy path reads the canonical demo manifest (a `RawSourceBundle`) and
+produces a valid `ResearchBrief` JSON plus a `RunManifest` tracking artifact.
 
-### Settings Modal
-
-![Settings Modal](https://github.com/user-attachments/assets/983c9cd1-d283-49d8-8d8b-2747b951b256)
-
-Configure your API keys directly in the browser:
-- OpenAI API Key for AI analysis
-- Google API Key and CSE ID for search functionality
-- Optional Pipeline API Key for authentication
-- Keys are securely stored in browser's localStorage
-
-### Job Status Tracking
-
-![Job Running](https://github.com/user-attachments/assets/e3bd3dc7-720b-4290-a4a2-f063f8750387)
-
-Monitor your research job in real-time with:
-- Live status updates (pending, running, completed, failed)
-- Progress bar visualization
-- Job ID for reference
-
-![Job Completed](https://github.com/user-attachments/assets/72bcc73d-22a5-441d-8963-7b478f2106f5)
-
-When complete, access your comprehensive research report with a single click.
-
-### Accessing the Web UI
-
-#### Option 1: Using Docker Compose (Recommended)
+### Quick Start
 
 ```bash
-# Start all services including the UI
-docker-compose up
+# Install core dependencies (pydantic, click)
+pip install pydantic pydantic-settings click
 
-# Access the UI at http://localhost:8000
+# Generate a ResearchBrief from the demo manifest
+python -m content_research_pipeline.brief_cli generate \
+    --manifest demo_data/jwst_star_formation_early_universe_demo/manifest.json \
+    --output-dir output/
+
+# Validate the generated artifacts
+python -m content_research_pipeline.brief_cli validate \
+    --brief output/jwst_star_formation_early_universe_demo__ResearchBrief__*.json \
+    --run-manifest output/jwst_star_formation_early_universe_demo__RunManifest__*.json
 ```
 
-#### Option 2: Running Locally
+### What it produces
+
+| Artifact | Description |
+|----------|-------------|
+| `ResearchBrief` | Structured research output with executive summary, key findings, entities, timeline, source index, citation map, open questions, and recommended angles. |
+| `RunManifest` | Tracking artifact recording inputs, outputs, metrics, and status for the research run. |
+
+Output filenames follow the naming convention: `<topic_slug>__<artifact_type>__<timestamp>.json`
+
+### Consuming upstream artifacts
+
+The generator supports optional upstream artifacts for richer output:
 
 ```bash
-# Start the API server (includes UI)
-python -m content_research_pipeline.cli serve --host 0.0.0.0 --port 8000
-
-# Access the UI at http://localhost:8000
+python -m content_research_pipeline.brief_cli generate \
+    --manifest path/to/RawSourceBundle.json \
+    --documents path/to/NormalizedDocumentSet.json \
+    --chunks path/to/ChunkSet.json \
+    --graph path/to/KnowledgeGraphPackage.json \
+    --output-dir output/
 ```
 
-#### Option 3: GitHub Codespaces (One-Click Demo)
+When a `KnowledgeGraphPackage` is provided, entities are derived from graph nodes.
+When a `NormalizedDocumentSet` is provided, key findings are extracted from documents.
 
-Click the "Code" button on GitHub and select "Create codespace on main" for an instant, pre-configured development environment with the UI ready to use.
-
-## Installation
-
-### Prerequisites
-
-- Python 3.8+
-- OpenAI API key
-- Google Search API key and Custom Search Engine ID
-
-### Setup
-
-1. **Clone the repository**:
-```bash
-git clone https://github.com/siddhant61/content-research-pipeline.git
-cd content-research-pipeline
-```
-
-2. **Install dependencies**:
-```bash
-pip install -r requirements.txt
-```
-
-3. **Download spaCy language model**:
-```bash
-python -m spacy download en_core_web_sm
-```
-
-4. **Set up environment variables**:
-```bash
-cp env.example .env
-# Edit .env with your API keys
-```
-
-Required environment variables:
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `GOOGLE_API_KEY`: Your Google Search API key
-- `GOOGLE_CSE_ID`: Your Google Custom Search Engine ID
-
-5. **Validate setup**:
-```bash
-python -m content_research_pipeline.cli validate
-```
-
-## Usage
-
-### Command Line Interface
-
-The CLI provides several commands for different operations:
-
-#### Research Command
-Perform comprehensive research on a topic:
+### Validation
 
 ```bash
-python -m content_research_pipeline.cli research "Impact of climate change on agriculture"
+# Validate any ResearchBrief JSON against the shared contract
+python -m content_research_pipeline.brief_cli validate --brief path/to/ResearchBrief.json
+
+# Validate a RunManifest
+python -m content_research_pipeline.brief_cli validate --run-manifest path/to/RunManifest.json
 ```
 
-Options:
-- `--output, -o`: Output directory for results
-- `--format, -f`: Output format (html, json, both)
-- `--max-results, -m`: Maximum number of search results
-- `--no-images`: Skip image search
-- `--no-videos`: Skip video search
-- `--no-news`: Skip news search
-- `--verbose, -v`: Enable verbose logging
-
-#### Quick Search
-Perform a quick search without full analysis:
+### Running Tests
 
 ```bash
-python -m content_research_pipeline.cli search "artificial intelligence" --type web --num-results 10
+# Run Phase 1 tests (models, generator, validator, demo contract)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py -v
+
+# Run all working tests (Phase 1 + config + prompts)
+pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_config.py tests/test_prompts.py -v
+
+# Run all tests (requires full dependencies from requirements.txt)
+pytest tests/
 ```
 
-#### Cache Management
-Manage the application cache:
+### Audit
 
-```bash
-# Show cache statistics
-python -m content_research_pipeline.cli cache --stats
+See [AUDIT.md](AUDIT.md) for the full Phase 1 audit package covering entrypoints,
+contract alignment, happy-path status, broken paths, and implementation plan.
 
-# Clear cache
-python -m content_research_pipeline.cli cache --clear
-```
+## Artifacts This Repo Owns
 
-#### Configuration
-Show current configuration:
+| Artifact | Status |
+|----------|--------|
+| `ResearchBrief` | ✓ Implemented (Phase 1) |
+| `RunManifest` (research runs) | ✓ Implemented (Phase 1) |
 
-```bash
-python -m content_research_pipeline.cli config
-```
+## Artifacts This Repo Consumes
 
-#### Web Server (Optional)
-Start the web API server:
-
-```bash
-python -m content_research_pipeline.cli serve --host 0.0.0.0 --port 8000
-```
-
-Options:
-- `--host`: Host to bind to (default: 0.0.0.0)
-- `--port`: Port to bind to (default: 8000)
-- `--reload`: Enable auto-reload for development
-
-### Programmatic Usage
-
-```python
-from content_research_pipeline import ContentResearchPipeline
-
-async def main():
-    pipeline = ContentResearchPipeline()
-    result = await pipeline.run("climate change impacts")
-    
-    # Access results
-    print(f"Analysis: {result.state.analysis.summary}")
-    print(f"Topics: {result.state.analysis.topics}")
-    print(f"Sentiment: {result.state.analysis.sentiment}")
-    
-    # Save HTML report
-    with open("report.html", "w") as f:
-        f.write(result.html_report)
-
-import asyncio
-asyncio.run(main())
-```
-
-### API Usage
-
-The FastAPI server provides RESTful endpoints for background job processing:
-
-#### Start a Research Job
-```bash
-curl -X POST "http://localhost:8000/research" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "climate change impacts", "include_images": true, "include_videos": true}'
-```
-
-Response:
-```json
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "pending",
-  "message": "Research job created successfully. Use /status/{job_id} to check progress."
-}
-```
-
-#### Check Job Status
-```bash
-curl "http://localhost:8000/status/550e8400-e29b-41d4-a716-446655440000"
-```
-
-Response (when completed):
-```json
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "completed",
-  "query": "climate change impacts",
-  "created_at": "2024-01-01T00:00:00",
-  "completed_at": "2024-01-01T00:05:30",
-  "result": {
-    "state": {...},
-    "visualization": {...},
-    "processing_time": 330.5
-  }
-}
-```
-
-#### List All Jobs
-```bash
-curl "http://localhost:8000/jobs?limit=10&status=completed"
-```
-
-#### Delete a Job
-```bash
-curl -X DELETE "http://localhost:8000/jobs/550e8400-e29b-41d4-a716-446655440000"
-```
-
-### API Endpoints
-
-- `GET /` - API information
-- `GET /health` - Health check
-- `POST /research` - Start a new research job
-- `GET /status/{job_id}` - Get job status and results
-- `GET /jobs` - List all jobs with optional filtering
-- `DELETE /jobs/{job_id}` - Delete a completed or failed job
-```
+| Artifact | Owner | Status |
+|----------|-------|--------|
+| `RawSourceBundle` | material-ingestion-pipeline | ✓ Consumed (manifest-driven) |
+| `NormalizedDocumentSet` | material-ingestion-pipeline | ✓ Supported (optional input) |
+| `ChunkSet` | material-ingestion-pipeline | ✓ Supported (optional input) |
+| `KnowledgeGraphPackage` | material-ingestion-pipeline | ✓ Supported (optional input) |
 
 ## Project Structure
 
 ```
-content_research_pipeline/
+content-research-pipeline/
 ├── src/content_research_pipeline/
-│   ├── __init__.py                 # Package initialization
-│   ├── cli.py                      # Command-line interface
-│   ├── config/
-│   │   ├── __init__.py
-│   │   ├── settings.py             # Configuration management
-│   │   ├── logging.py              # Logging configuration
-│   │   └── prompts.py              # LLM prompt templates
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── pipeline.py             # Main pipeline orchestration
-│   │   ├── analysis.py             # Content analysis functions
-│   │   └── entities.py             # Entity extraction and graph creation
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── search.py               # Google Search API integration
-│   │   ├── scraper.py              # Web scraping functionality
-│   │   ├── vector_store.py         # Vector database operations
-│   │   └── llm.py                  # Language model interactions
+│   ├── brief_cli.py               # Phase 1 CLI: generate & validate
+│   ├── cli.py                     # Legacy CLI (web search pipeline)
 │   ├── data/
-│   │   ├── __init__.py
-│   │   ├── models.py               # Pydantic models
-│   │   └── schemas.py              # API response schemas
+│   │   ├── artifacts.py           # Contract-aligned Pydantic models
+│   │   └── models.py              # Legacy pipeline models
+│   ├── core/
+│   │   ├── brief_generator.py     # ResearchBrief generation from artifacts
+│   │   ├── pipeline.py            # Legacy web search pipeline
+│   │   └── analysis.py            # NLP analysis module
 │   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── text_processing.py      # Text processing utilities
-│   │   ├── media_handlers.py       # Image/video handling
-│   │   └── caching.py              # Caching functionality
-│   ├── visualization/
-│   │   ├── __init__.py
-│   │   ├── html_generator.py       # HTML report generation
-│   │   └── charts.py               # Chart generation utilities
-│   └── api/                        # Optional FastAPI endpoints
-│       ├── __init__.py
-│       └── main.py                 # FastAPI application
-├── tests/                          # Test files
-├── docs/                           # Documentation
-├── requirements.txt                # Python dependencies
-├── env.example                     # Environment variables template
-├── .gitignore                      # Git ignore file
-└── README.md                       # This file
+│   │   ├── contract_validator.py  # Validation against shared contract
+│   │   └── caching.py             # Cache utilities
+│   ├── config/                    # Settings, logging, prompts
+│   ├── services/                  # Search, scraper, LLM, vector store
+│   ├── visualization/             # HTML reports, charts
+│   └── api/                       # FastAPI endpoints
+├── contracts/                     # Shared cross-repo artifact contracts
+│   ├── shared_artifacts.json
+│   ├── schemas.md
+│   └── demo_manifest.md
+├── demo_data/                     # Canonical demo scaffold
+│   └── jwst_star_formation_early_universe_demo/
+│       ├── manifest.json          # RawSourceBundle for JWST demo
+│       ├── ResearchBrief.sample.json
+│       ├── RunManifest.sample.json
+│       └── sources/
+├── tests/
+│   ├── test_artifacts.py          # Artifact model tests
+│   ├── test_brief_generator.py    # Brief generation tests
+│   ├── test_contract_validator.py # Validation tests
+│   └── ...                        # Legacy pipeline tests
+└── README.md
 ```
 
-## Configuration
+## Assumptions About Upstream Artifacts
 
-The application uses environment variables for configuration. Copy `env.example` to `.env` and configure:
+- The `RawSourceBundle` (demo manifest) is treated as the primary input in Phase 1.
+- When upstream `NormalizedDocumentSet`, `ChunkSet`, or `KnowledgeGraphPackage` artifacts
+  are not yet available, the generator produces a valid brief from manifest metadata and
+  seed entities alone.
+- Source attribution is preserved from the manifest's `sources[]` into the brief's
+  `source_index[]` and `citation_map`.
 
-### Required Settings
-- `OPENAI_API_KEY`: OpenAI API key for AI analysis
-- `GOOGLE_API_KEY`: Google Search API key
-- `GOOGLE_CSE_ID`: Google Custom Search Engine ID
+---
 
-### Optional Settings
-- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR)
-- `CHROMA_PERSIST_DIRECTORY`: Vector database directory
-- `CACHE_EXPIRE_SECONDS`: Cache expiration time
-- `MAX_SEARCH_RESULTS`: Maximum search results per source
-- `MAX_TOPICS`: Maximum number of topics to extract
-- `LLM_MODEL`: OpenAI model to use
+## Legacy Features
 
-## API Keys Setup
+The repository also includes a full web search pipeline (search → scrape → analyze → visualize)
+that requires additional dependencies (OpenAI, Google Search API, spaCy, Chroma, Redis).
 
-### OpenAI API Key
-1. Go to [OpenAI API Keys](https://platform.openai.com/api-keys)
-2. Create a new API key
-3. Add it to your `.env` file
+### Full Installation (Legacy Pipeline)
 
-### Google Search API
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable the Custom Search API
-4. Create credentials for the API
-5. Set up a Custom Search Engine at [Google CSE](https://cse.google.com/)
-6. Add both keys to your `.env` file
-
-## Output
-
-The system generates comprehensive reports including:
-
-- **Executive Summary**: AI-generated analysis of the research topic
-- **Interactive Entity Relationship Graph**: Zoomable, interactive visualization of key entities and their relationships using vis.js
-- **Enhanced Timeline**: Vertical timeline with visual markers, hover effects, and source attribution
-- **Sentiment Analysis**: Overall sentiment and emotional tone
-- **Topic Modeling**: Key themes and topics identified
-- **Word Cloud**: Visual representation of key terms
-- **Source Credibility Scores**: AI-assessed credibility scores (0.0-1.0) for each information source
-- **Related Queries**: Suggested follow-up research topics
-
-## Architecture
-
-The system is built with a modular architecture:
-
-1. **Search Layer**: Aggregates content from multiple sources
-2. **Scraping Layer**: Extracts content from web pages
-3. **Analysis Layer**: Performs AI-powered analysis with credibility assessment
-4. **Storage Layer**: Manages vector database and caching
-5. **Visualization Layer**: Generates interactive reports and visualizations
-6. **API Layer**: RESTful API for background job processing (optional)
-
-## Development
-
-### Running Tests
 ```bash
-pytest tests/
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+cp env.example .env  # Configure API keys
 ```
 
-### Code Quality
+### Legacy CLI Commands
+
 ```bash
-# Format code
-black src/
+# Full web research pipeline
+python -m content_research_pipeline.cli research "topic query"
 
-# Lint code
-flake8 src/
+# Quick search
+python -m content_research_pipeline.cli search "query" --type web
 
-# Type checking
-mypy src/
-```
+# Start web API server
+python -m content_research_pipeline.cli serve
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## Security Notes
-
-- Never commit API keys to version control
-- Use environment variables for sensitive configuration
-- Regularly rotate API keys
-- Monitor API usage to prevent abuse
-
-## Troubleshooting
-
-### Common Issues
-
-1. **spaCy model not found**:
-   ```bash
-   python -m spacy download en_core_web_sm
-   ```
-
-2. **API key errors**:
-   - Verify keys are set in `.env`
-   - Check API key permissions and quotas
-
-3. **Permission errors**:
-   - Ensure write permissions for output directories
-   - Check Chroma database directory permissions
-
-4. **Memory issues**:
-   - Reduce `MAX_SEARCH_RESULTS` in configuration
-   - Clear cache regularly
-
-### Debug Mode
-Enable debug logging:
-```bash
-export LOG_LEVEL=DEBUG
-python -m content_research_pipeline.cli research "your query" --verbose
-```
-
-## License
-
-This project is licensed under the MIT License. See LICENSE file for details.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the logs for error messages
-3. Open an issue on GitHub
-4. Contact the development team
-
-## Changelog
-
-### Version 1.0.0
-- Initial release
-- Multi-source content aggregation
-- AI-powered analysis
-- Interactive visualizations
-- CLI and API interfaces
-- Vector database integration
-- Caching system 
+# Validate environment
+python -m content_research_pipeline.cli validate
+``` 
