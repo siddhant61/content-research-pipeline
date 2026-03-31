@@ -422,7 +422,7 @@ class TestStage2Simplification:
         """The artifact-mode CLI must use explicit file arguments referencing
         the shell-local RESOLVED_DIR variable, not --upstream-handoff-dir
         with a step output expression like steps.*.outputs.upstream_dir."""
-        assert '--manifest ${RESOLVED_DIR}/RawSourceBundle.json' in self.workflow_text
+        assert '"${RESOLVED_DIR}/RawSourceBundle.json"' in self.workflow_text
 
     def test_fixture_cli_uses_shell_variable(self):
         """In fixture fallback, the CLI must use the shell-local FIXTURE_DIR variable."""
@@ -435,7 +435,10 @@ class TestStage2Simplification:
             line for line in self.workflow_text.splitlines()
             if "--upstream-handoff-dir" in line or "--manifest" in line or "--graph" in line
         ]
-        assert len(cli_lines) >= 2, "Expected at least 2 CLI argument lines"
+        assert len(cli_lines) >= 2, (
+            "Expected at least 2 CLI argument lines (explicit file args in artifact "
+            "mode + --upstream-handoff-dir in fixture mode)"
+        )
         for line in cli_lines:
             assert "steps." not in line, (
                 f"CLI args should use shell variable, not step output: {line}"
@@ -464,15 +467,15 @@ class TestExplicitFileInputWorkflow:
 
     def test_artifact_mode_uses_explicit_manifest(self):
         """Artifact mode must pass --manifest with RawSourceBundle.json."""
-        assert "--manifest ${RESOLVED_DIR}/RawSourceBundle.json" in self.workflow_text
+        assert '"${RESOLVED_DIR}/RawSourceBundle.json"' in self.workflow_text
 
     def test_artifact_mode_uses_explicit_documents(self):
         """Artifact mode must pass --documents with NormalizedDocumentSet.json."""
-        assert "--documents ${RESOLVED_DIR}/NormalizedDocumentSet.json" in self.workflow_text
+        assert '"${RESOLVED_DIR}/NormalizedDocumentSet.json"' in self.workflow_text
 
     def test_artifact_mode_uses_explicit_graph(self):
         """Artifact mode must pass --graph with KnowledgeGraphPackage.json."""
-        assert "--graph ${RESOLVED_DIR}/KnowledgeGraphPackage.json" in self.workflow_text
+        assert '"${RESOLVED_DIR}/KnowledgeGraphPackage.json"' in self.workflow_text
 
     def test_artifact_mode_does_not_use_upstream_handoff_dir(self):
         """Artifact mode must NOT use --upstream-handoff-dir for the resolved
