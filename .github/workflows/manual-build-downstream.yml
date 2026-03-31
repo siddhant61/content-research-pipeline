@@ -69,7 +69,7 @@ jobs:
         echo "Download step outcome: '${{ steps.download-artifact.outcome }}'"
         echo "Download target directory: /tmp/upstream-handoff"
         if [ "${{ steps.download-artifact.outcome }}" != "success" ]; then
-          echo "::error ::Artifact download FAILED for '${{ inputs.upstream_artifact_name }}'. The upstream job may not have produced this artifact, or the artifact name may be misspelled. Expected artifact name: '${{ inputs.upstream_artifact_name }}'"
+          echo "::error ::Artifact download FAILED for '${{ inputs.upstream_artifact_name }}'. The upstream job may not have produced this artifact, or the artifact name may be misspelled."
           exit 1
         fi
         if [ ! -d "/tmp/upstream-handoff" ]; then
