@@ -276,3 +276,63 @@ class TestWorkflowYAMLStructure:
 
     def test_handoff_manifest_check_in_resolve(self):
         assert "handoff_manifest.json" in self.workflow_text
+
+
+# ── Diagnostic hardening (Phase 4.1) ────────────────────────────────────────
+
+class TestWorkflowDiagnosticHardening:
+    """Validate that the reusable workflow includes diagnostic and error-handling
+    improvements for artifact transport (Phase 4.1 hardening)."""
+
+    @pytest.fixture(autouse=True)
+    def _load_workflow(self):
+        self.workflow_text = WORKFLOW_PATH.read_text()
+
+    def test_debug_step_present(self):
+        """A dedicated debug step must exist to print artifact transport inputs."""
+        assert "Debug artifact transport inputs" in self.workflow_text
+
+    def test_debug_step_prints_upstream_artifact_name(self):
+        """The debug step must reference upstream_artifact_name."""
+        assert "upstream_artifact_name received:" in self.workflow_text
+
+    def test_debug_step_prints_download_directory(self):
+        """The debug step must print the download target directory."""
+        assert "/tmp/upstream-handoff" in self.workflow_text
+
+    def test_download_step_has_continue_on_error(self):
+        """The download step must use continue-on-error so failures are diagnosable."""
+        assert "continue-on-error: true" in self.workflow_text
+
+    def test_download_step_has_id(self):
+        """The download step must have an id to reference its outcome."""
+        assert "id: download-artifact" in self.workflow_text
+
+    def test_verify_step_present(self):
+        """A verification step must exist after artifact download."""
+        assert "Verify artifact download" in self.workflow_text
+
+    def test_verify_step_checks_outcome(self):
+        """The verification step must check the download step outcome."""
+        assert "steps.download-artifact.outcome" in self.workflow_text
+
+    def test_verify_step_emits_error_on_failure(self):
+        """The verification step must emit a clear ::error annotation on failure."""
+        assert "::error ::Artifact download FAILED" in self.workflow_text
+
+    def test_resolve_step_logs_both_paths(self):
+        """The resolve step must log both the artifact and fallback paths."""
+        assert "Artifact download path:" in self.workflow_text
+        assert "Fallback fixture path:" in self.workflow_text
+
+    def test_workflow_dispatch_unchanged(self):
+        """workflow_dispatch must remain a bare trigger with no inputs."""
+        import yaml
+        wf = yaml.safe_load(self.workflow_text)
+        # PyYAML parses the 'on' key as boolean True
+        triggers = wf.get("on") or wf.get(True)
+        assert triggers is not None, "Workflow must have an 'on' trigger block"
+        dispatch = triggers.get("workflow_dispatch")
+        assert dispatch is None or dispatch == {}, (
+            f"workflow_dispatch should be bare, got: {dispatch}"
+        )

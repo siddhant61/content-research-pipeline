@@ -34,33 +34,81 @@ jobs:
         python -m pip install --upgrade pip
         pip install pydantic==2.5.0 pydantic-settings==2.1.0 click==8.1.7 loguru==0.7.2
 
+    # ── Debug: print artifact transport inputs ────────────────────
+    - name: Debug artifact transport inputs
+      run: |
+        echo "::group::Artifact Transport Debug"
+        echo "upstream_artifact_name received: '${{ inputs.upstream_artifact_name }}'"
+        ARTIFACT_DIR="/tmp/upstream-handoff"
+        FIXTURE_DIR="integration_fixtures/jwst/upstream/"
+        if [ -n "${{ inputs.upstream_artifact_name }}" ]; then
+          echo "→ Artifact mode: will attempt to download '${{ inputs.upstream_artifact_name }}'"
+          echo "→ Download target directory: ${ARTIFACT_DIR}"
+        else
+          echo "→ Fixture mode: no upstream_artifact_name provided"
+          echo "→ Fallback directory: ${FIXTURE_DIR}"
+        fi
+        echo "::endgroup::"
+
     # ── Artifact-download mode (orchestration) ──────────────────────
     - name: Download upstream artifact
+      id: download-artifact
       if: inputs.upstream_artifact_name != ''
+      continue-on-error: true
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.upstream_artifact_name }}
         path: /tmp/upstream-handoff
 
+    # ── Verify artifact download result ─────────────────────────────
+    - name: Verify artifact download
+      if: inputs.upstream_artifact_name != ''
+      run: |
+        echo "::group::Artifact Download Verification"
+        echo "Requested artifact name: '${{ inputs.upstream_artifact_name }}'"
+        echo "Download step outcome: '${{ steps.download-artifact.outcome }}'"
+        echo "Download target directory: /tmp/upstream-handoff"
+        if [ "${{ steps.download-artifact.outcome }}" != "success" ]; then
+          echo "::error ::Artifact download FAILED for '${{ inputs.upstream_artifact_name }}'. The upstream job may not have produced this artifact, or the artifact name may be misspelled. Expected artifact name: '${{ inputs.upstream_artifact_name }}'"
+          exit 1
+        fi
+        if [ ! -d "/tmp/upstream-handoff" ]; then
+          echo "::error ::Download directory /tmp/upstream-handoff does not exist despite successful download step."
+          exit 1
+        fi
+        echo "Contents of /tmp/upstream-handoff:"
+        ls -la /tmp/upstream-handoff/
+        if [ -f "/tmp/upstream-handoff/handoff_manifest.json" ]; then
+          echo "✓ handoff_manifest.json found"
+        else
+          echo "::error ::handoff_manifest.json NOT found in downloaded artifact. The upstream artifact '${{ inputs.upstream_artifact_name }}' may be incomplete or malformed."
+          exit 1
+        fi
+        echo "::endgroup::"
+
     # ── Resolve which upstream directory to use ─────────────────────
     - name: Resolve upstream handoff directory
       id: resolve-upstream
       run: |
+        ARTIFACT_DIR="/tmp/upstream-handoff"
+        FIXTURE_DIR="integration_fixtures/jwst/upstream/"
+        echo "Artifact download path: ${ARTIFACT_DIR}"
+        echo "Fallback fixture path: ${FIXTURE_DIR}"
         if [ -n "${{ inputs.upstream_artifact_name }}" ] \
-           && [ -d "/tmp/upstream-handoff" ] \
-           && [ -f "/tmp/upstream-handoff/handoff_manifest.json" ]; then
-          echo "upstream_dir=/tmp/upstream-handoff" >> "$GITHUB_OUTPUT"
+           && [ -d "${ARTIFACT_DIR}" ] \
+           && [ -f "${ARTIFACT_DIR}/handoff_manifest.json" ]; then
+          echo "upstream_dir=${ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=artifact" >> "$GITHUB_OUTPUT"
           echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}'"
           python -c "
         import json, pathlib
-        m = json.loads(pathlib.Path('/tmp/upstream-handoff/handoff_manifest.json').read_text())
+        m = json.loads(pathlib.Path('${ARTIFACT_DIR}/handoff_manifest.json').read_text())
         print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
         "
         else
-          echo "upstream_dir=integration_fixtures/jwst/upstream/" >> "$GITHUB_OUTPUT"
+          echo "upstream_dir=${FIXTURE_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=fixture" >> "$GITHUB_OUTPUT"
-          echo "::notice ::Using committed local fixtures (integration_fixtures/jwst/upstream/)"
+          echo "::notice ::Using committed local fixtures (${FIXTURE_DIR})"
         fi
 
     - name: Generate downstream handoff package
