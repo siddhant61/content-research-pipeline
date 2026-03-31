@@ -230,6 +230,11 @@ class TestLocalFixtureFallback:
         fixtures = load_from_handoff_manifest(str(tmp_path))
         assert fixtures.graph is not None
         assert fixtures.handoff_source_run_id is None
+        # Verify the loaded graph data matches the source file
+        with open(UPSTREAM_DIR / "KnowledgeGraphPackage.json") as f:
+            expected = json.load(f)
+        assert fixtures.graph.artifact_id == expected["artifact_id"]
+        assert fixtures.graph.topic == expected["topic"]
 
 
 # ── Workflow YAML structure ──────────────────────────────────────────────────
