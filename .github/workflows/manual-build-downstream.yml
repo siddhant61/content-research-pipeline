@@ -3,6 +3,9 @@ name: Build Downstream Handoff
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-downstream:
     runs-on: ubuntu-latest
