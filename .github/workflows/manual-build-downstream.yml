@@ -3,6 +3,15 @@ name: Build Downstream Handoff
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      upstream_artifact_name:
+        description: >
+          Name of the upstream handoff artifact to download from the current
+          orchestration run. When empty, the workflow falls back to the
+          committed local fixtures in integration_fixtures/jwst/upstream/.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -25,11 +34,40 @@ jobs:
         python -m pip install --upgrade pip
         pip install pydantic==2.5.0 pydantic-settings==2.1.0 click==8.1.7 loguru==0.7.2
 
+    # ── Artifact-download mode (orchestration) ──────────────────────
+    - name: Download upstream artifact
+      if: inputs.upstream_artifact_name != ''
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.upstream_artifact_name }}
+        path: /tmp/upstream-handoff
+
+    # ── Resolve which upstream directory to use ─────────────────────
+    - name: Resolve upstream handoff directory
+      id: resolve-upstream
+      run: |
+        if [ -n "${{ inputs.upstream_artifact_name }}" ] \
+           && [ -d "/tmp/upstream-handoff" ] \
+           && [ -f "/tmp/upstream-handoff/handoff_manifest.json" ]; then
+          echo "upstream_dir=/tmp/upstream-handoff" >> "$GITHUB_OUTPUT"
+          echo "mode=artifact" >> "$GITHUB_OUTPUT"
+          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}'"
+          python -c "
+        import json, pathlib
+        m = json.loads(pathlib.Path('/tmp/upstream-handoff/handoff_manifest.json').read_text())
+        print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
+        "
+        else
+          echo "upstream_dir=integration_fixtures/jwst/upstream/" >> "$GITHUB_OUTPUT"
+          echo "mode=fixture" >> "$GITHUB_OUTPUT"
+          echo "::notice ::Using committed local fixtures (integration_fixtures/jwst/upstream/)"
+        fi
+
     - name: Generate downstream handoff package
       run: |
         rm -rf integration_fixtures/jwst/downstream/*
         PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
-            --upstream-handoff-dir integration_fixtures/jwst/upstream/ \
+            --upstream-handoff-dir "${{ steps.resolve-upstream.outputs.upstream_dir }}" \
             --output-dir integration_fixtures/jwst/downstream/ \
             --emit-handoff-manifest
 
@@ -41,6 +79,12 @@ jobs:
             --brief "$BRIEF"
         PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
             --run-manifest "$MANIFEST"
+
+    - name: Report handoff mode
+      run: |
+        echo "## Downstream Handoff Build" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Mode:** ${{ steps.resolve-upstream.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Upstream dir:** ${{ steps.resolve-upstream.outputs.upstream_dir }}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload downstream handoff artifact
       uses: actions/upload-artifact@v4

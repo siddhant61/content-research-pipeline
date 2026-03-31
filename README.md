@@ -97,21 +97,54 @@ PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
 
 ### GitHub Actions — Downstream Handoff Build
 
-The **Build Downstream Handoff** workflow (`.github/workflows/manual-build-downstream.yml`) regenerates the canonical downstream handoff package from the upstream fixtures checked into the repo.
+The **Build Downstream Handoff** workflow (`.github/workflows/manual-build-downstream.yml`) regenerates the canonical downstream handoff package. It supports two modes of operation: a **manual local-fixture mode** and an **orchestration artifact-download mode**.
 
 **Trigger modes:**
 
 | Mode | Trigger | Use case |
 |------|---------|----------|
-| Manual | `workflow_dispatch` | Run from the **Actions** tab in GitHub |
-| Reusable | `workflow_call` | Called by an orchestration repo (e.g. `pipeline-integration`) |
+| Manual (local fixture) | `workflow_dispatch` | Run from the **Actions** tab — uses committed `integration_fixtures/jwst/upstream/` |
+| Orchestration (artifact download) | `workflow_call` with `upstream_artifact_name` | Called by an orchestration repo — downloads the real upstream artifact from the current run |
 
-**How to run manually:**
+#### Manual Local-Fixture Mode
+
+Uses the committed fixture directory `integration_fixtures/jwst/upstream/` as the upstream input. No additional inputs required.
+
+**How to run:**
 1. Go to the **Actions** tab in GitHub.
 2. Select the **Build Downstream Handoff** workflow from the left sidebar.
 3. Click **Run workflow** and confirm.
 
-**How to call as a reusable workflow:**
+#### Orchestration Artifact-Download Mode
+
+When called as a reusable workflow by an orchestrator (e.g. `pipeline-integration`), the workflow can download the actual upstream handoff artifact produced by an earlier job in the same orchestration run.
+
+**`workflow_call` inputs:**
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `upstream_artifact_name` | `string` | no | `""` | Name of the upstream artifact to download via `actions/download-artifact`. When empty, falls back to local fixtures. |
+
+The workflow resolves the upstream directory as follows:
+1. If `upstream_artifact_name` is provided, download the named artifact into `/tmp/upstream-handoff`.
+2. If the downloaded directory contains a valid `handoff_manifest.json`, use it as the upstream input.
+3. Otherwise, fall back to the committed `integration_fixtures/jwst/upstream/` directory.
+
+The `source_run_id` from the downloaded artifact's `handoff_manifest.json` is preserved through the entire downstream output chain (ResearchBrief → RunManifest → downstream `handoff_manifest.json`).
+
+**How to call as a reusable workflow (with upstream artifact):**
+```yaml
+jobs:
+  ingest:
+    # ... produces artifact "jwst-upstream-handoff"
+  research:
+    needs: ingest
+    uses: siddhant61/content-research-pipeline/.github/workflows/manual-build-downstream.yml@main
+    with:
+      upstream_artifact_name: jwst-upstream-handoff
+```
+
+**How to call as a reusable workflow (local-fixture fallback):**
 ```yaml
 jobs:
   research:
@@ -123,7 +156,7 @@ jobs:
 - **Output directory:** `integration_fixtures/jwst/downstream/`
 - **Contents:** `ResearchBrief.json`, `RunManifest.json`, `handoff_manifest.json`
 
-The workflow generates a fresh `ResearchBrief`, `RunManifest`, and `handoff_manifest.json` from `integration_fixtures/jwst/upstream/`, validates each artifact against the shared contract, and uploads the complete downstream directory as the workflow artifact.
+The workflow generates a fresh `ResearchBrief`, `RunManifest`, and `handoff_manifest.json` from the resolved upstream directory, validates each artifact against the shared contract, and uploads the complete downstream directory as the workflow artifact.
 
 ## Phase 2B — Full Upstream Handoff Integration
 
@@ -317,14 +350,17 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 + 2A + 2B + Phase 3 tests (224 tests)
-PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py -v --no-cov
+# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (261 tests)
+PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py -v --no-cov
+
+# Run Phase 4 artifact-transport tests only
+PYTHONPATH=src pytest tests/test_phase4_artifact_transport.py -v --no-cov
 
 # Run Phase 3 integration tests only
 PYTHONPATH=src pytest tests/test_phase3_integration.py -v --no-cov
 
-# Run all working tests (Phase 1/1.5/2A/2B/3 + config + prompts)
-PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_config.py tests/test_prompts.py -v --no-cov
+# Run all working tests (Phase 1/1.5/2A/2B/3/4 + config + prompts)
+PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py tests/test_config.py tests/test_prompts.py -v --no-cov
 
 # Run all tests (requires full dependencies from requirements.txt)
 pytest tests/
@@ -431,6 +467,7 @@ content-research-pipeline/
 │   ├── test_fixture_integration.py # Fixture-based integration tests (Phase 2A)
 │   ├── test_phase2b_handoff.py    # Upstream handoff integration tests (Phase 2B)
 │   ├── test_phase3_integration.py # Upstream/downstream handoff round-trip tests (Phase 3)
+│   ├── test_phase4_artifact_transport.py # Artifact transport & workflow tests (Phase 4)
 │   ├── test_contract_validator.py # Validation tests
 │   ├── test_demo_contract.py      # Demo fixture contract tests
 │   └── ...                        # Legacy pipeline tests
