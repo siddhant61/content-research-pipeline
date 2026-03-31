@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "handoff_type": "upstream",
+  "pipeline": "material-ingestion-pipeline",
+  "produced_for": "content-research-pipeline",
+  "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
+  "topic_slug": "jwst_star_formation_early_universe_demo",
+  "source_run_id": "ingest-run-001",
+  "created_at": "2026-03-30T02:00:00Z",
+  "artifacts": [
+    {
+      "artifact_type": "KnowledgeGraphPackage",
+      "artifact_id": "jwst-demo-kg-001",
+      "path": "KnowledgeGraphPackage.json",
+      "required": true,
+      "description": "Knowledge graph with 5 nodes and 4 edges extracted from JWST sources"
+    },
+    {
+      "artifact_type": "NormalizedDocumentSet",
+      "artifact_id": "jwst-demo-nds-001",
+      "path": "NormalizedDocumentSet.json",
+      "required": false,
+      "description": "2 normalized documents from NASA mission overview and fact sheet"
+    },
+    {
+      "artifact_type": "ChunkSet",
+      "artifact_id": "jwst-demo-chunks-001",
+      "path": "ChunkSet.json",
+      "required": false,
+      "description": "6 text chunks for provenance-level traceability"
+    },
+    {
+      "artifact_type": "RawSourceBundle",
+      "artifact_id": "jwst-star-formation-demo-source-bundle",
+      "path": "RawSourceBundle.json",
+      "required": false,
+      "description": "Original source manifest with 6 NASA/ESA source references"
+    }
+  ],
+  "regeneration_command": "# Upstream artifacts are owned by material-ingestion-pipeline.\n# To regenerate, re-run the ingestion pipeline and copy outputs here.",
+  "validation_command": "python -m content_research_pipeline.brief_cli validate --run-manifest integration_fixtures/jwst/upstream/handoff_manifest.json",
+  "known_limitations": [
+    "Raw web assets are not bundled; sources point to live URLs.",
+    "Embedding vectors are not included (embedding_vector_ref is null).",
+    "ChunkSet contains only 6 representative chunks, not a full document split.",
+    "NormalizedDocumentSet contains 2 documents; full ingestion would include all 6 sources."
+  ]
+}

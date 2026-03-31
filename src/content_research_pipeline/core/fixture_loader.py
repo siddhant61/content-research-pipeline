@@ -4,17 +4,24 @@ Stable upstream fixture loader for the Content Research Pipeline.
 Discovers and loads canonical upstream ingestion artifacts from a fixture
 directory (e.g. ``demo_data/jwst_star_formation_early_universe_demo/``).
 
-This module provides a single entry-point for Phase 2A/2B fixture-based
+This module provides a single entry-point for Phase 2A/2B/3 fixture-based
 consumption of material-ingestion-pipeline outputs.  It looks for
 well-known filenames produced by that pipeline and returns loaded
 Pydantic models ready for ``BriefGenerator``.
 
-Well-known filenames
---------------------
+Well-known filenames (auto-discovery)
+--------------------------------------
 * ``KnowledgeGraphPackage.sample.json`` — preferred structured input
 * ``NormalizedDocumentSet.sample.json``  — fallback document-level input
 * ``ChunkSet.sample.json``              — chunk-level provenance (optional)
 * ``manifest.json``                      — RawSourceBundle (source metadata)
+
+Handoff-manifest-driven loading (Phase 3)
+-----------------------------------------
+When a ``handoff_manifest.json`` is present in the fixture directory, the
+loader uses the explicit artifact paths declared in that file instead of
+auto-discovery.  This is the preferred consumption path for the canonical
+upstream handoff package emitted by material-ingestion-pipeline.
 
 Contract assumptions
 --------------------
@@ -212,6 +219,115 @@ def load_upstream_fixtures(fixture_dir: str) -> UpstreamFixtures:
     if not result.has_any:
         result.warnings.append(
             "No upstream fixtures found in directory — cannot generate a ResearchBrief."
+        )
+
+    return result
+
+
+# ── Handoff-manifest-driven loading (Phase 3) ────────────────────────────────
+
+_HANDOFF_MANIFEST_FILENAMES = [
+    "handoff_manifest.json",
+]
+
+_ARTIFACT_TYPE_TO_LOADER_KEY: Dict[str, str] = {
+    "KnowledgeGraphPackage": "graph",
+    "NormalizedDocumentSet": "documents",
+    "ChunkSet": "chunks",
+    "RawSourceBundle": "bundle",
+}
+
+
+def load_from_handoff_manifest(handoff_dir: str) -> "UpstreamFixtures":
+    """Load upstream fixtures declared in a ``handoff_manifest.json``.
+
+    This is the Phase 3 preferred entry-point when consuming the canonical
+    upstream handoff package emitted by material-ingestion-pipeline.  It
+    reads the ``handoff_manifest.json`` in *handoff_dir* and loads each
+    artifact at the path declared in that file.
+
+    Falls back to ``load_upstream_fixtures()`` if no ``handoff_manifest.json``
+    is found in the directory (preserving backward-compatibility with
+    auto-discovery).
+
+    Args:
+        handoff_dir: Path to the directory containing the upstream handoff
+            package (i.e. ``integration_fixtures/jwst/upstream/``).
+
+    Returns:
+        An ``UpstreamFixtures`` with all declared artifacts loaded.
+
+    Raises:
+        FileNotFoundError: If *handoff_dir* does not exist.
+        ValueError: If the ``handoff_manifest.json`` is malformed or missing
+            a required field.
+    """
+    d = Path(handoff_dir)
+    if not d.is_dir():
+        raise FileNotFoundError(f"Handoff directory not found: {handoff_dir}")
+
+    manifest_path = _find_first(d, _HANDOFF_MANIFEST_FILENAMES)
+    if manifest_path is None:
+        # Fall back to auto-discovery when no handoff manifest is present.
+        return load_upstream_fixtures(handoff_dir)
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+
+    artifacts_list = manifest_data.get("artifacts")
+    if not isinstance(artifacts_list, list):
+        raise ValueError(
+            f"handoff_manifest.json is missing a valid 'artifacts' list: {manifest_path}"
+        )
+
+    result = UpstreamFixtures(fixture_dir=str(d))
+
+    _LOADERS: Dict[str, Any] = {
+        "graph": (KnowledgeGraphPackage, "graph_path"),
+        "documents": (NormalizedDocumentSet, "documents_path"),
+        "chunks": (ChunkSet, "chunks_path"),
+        "bundle": (RawSourceBundle, "bundle_path"),
+    }
+
+    for entry in artifacts_list:
+        artifact_type = entry.get("artifact_type", "")
+        rel_path = entry.get("path", "")
+        required = entry.get("required", False)
+        loader_key = _ARTIFACT_TYPE_TO_LOADER_KEY.get(artifact_type)
+
+        if loader_key is None:
+            result.warnings.append(
+                f"Unknown artifact_type '{artifact_type}' in handoff_manifest — skipped."
+            )
+            continue
+
+        artifact_path = d / rel_path
+        if not artifact_path.is_file():
+            msg = (
+                f"Declared artifact not found: {artifact_path} "
+                f"(artifact_type={artifact_type})"
+            )
+            if required:
+                raise FileNotFoundError(msg)
+            result.warnings.append(msg + " — skipped (not required).")
+            continue
+
+        model_cls, path_attr = _LOADERS[loader_key]
+        with open(artifact_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        setattr(result, loader_key, model_cls(**data))
+        setattr(result, path_attr, str(artifact_path))
+
+    # Cross-reference warnings (same as load_upstream_fixtures)
+    if result.graph and not result.bundle:
+        result.warnings.append(
+            "KG loaded without manifest: source_index origin_org/url will be 'unknown'/''."
+        )
+
+    if not result.has_any:
+        result.warnings.append(
+            "No upstream fixtures loaded from handoff_manifest — cannot generate a ResearchBrief."
         )
 
     return result

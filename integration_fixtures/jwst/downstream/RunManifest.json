@@ -1,0 +1,41 @@
+{
+  "artifact_type": "RunManifest",
+  "schema_version": "1.0.0",
+  "artifact_id": "manifest-72bfa8215a2d",
+  "created_at": "2026-03-31T08:34:07Z",
+  "producer": "content-research-pipeline",
+  "source_run_id": "run-c97f8498547d",
+  "pipeline_name": "content-research-pipeline",
+  "pipeline_stage": "generate-brief",
+  "status": "completed",
+  "inputs": {
+    "raw_source_bundle": "jwst-star-formation-demo-source-bundle",
+    "documents": "jwst-demo-nds-001",
+    "chunks": "jwst-demo-chunks-001",
+    "graph": "jwst-demo-kg-001",
+    "upstream_provenance": {
+      "graph_producer": "material-ingestion-pipeline",
+      "graph_source_run_id": "ingest-run-001",
+      "graph_provenance": {
+        "pipeline": "material-ingestion-pipeline",
+        "stage": "graph-construction",
+        "source_artifact": "jwst-star-formation-demo-source-bundle"
+      },
+      "documents_producer": "material-ingestion-pipeline",
+      "documents_source_run_id": "ingest-run-001",
+      "chunks_producer": "material-ingestion-pipeline",
+      "chunks_source_run_id": "ingest-run-001",
+      "bundle_producer": "starter-pack",
+      "bundle_source_run_id": "bootstrap"
+    }
+  },
+  "outputs": [
+    "integration_fixtures/jwst/downstream/jwst_star_formation_early_universe_demo__ResearchBrief__2026-03-31T083407Z.json"
+  ],
+  "metrics": {
+    "source_count": 6,
+    "finding_count": 9,
+    "entity_count": 5
+  },
+  "errors": []
+}

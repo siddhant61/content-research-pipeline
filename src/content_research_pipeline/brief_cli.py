@@ -20,6 +20,12 @@ Usage:
         --fixture-dir demo_data/jwst_star_formation_early_universe_demo/ \\
         --output-dir output/
 
+    # From an upstream handoff package (Phase 3 — canonical integration path)
+    python -m content_research_pipeline.brief_cli generate \\
+        --upstream-handoff-dir integration_fixtures/jwst/upstream/ \\
+        --output-dir integration_fixtures/jwst/downstream/ \\
+        --emit-handoff-manifest
+
     # Validate
     python -m content_research_pipeline.brief_cli validate \\
         --brief output/jwst_star_formation_early_universe_demo__ResearchBrief__*.json
@@ -35,9 +41,10 @@ from .core.brief_generator import (
     BriefGenerator,
     generate_brief_from_artifacts,
     generate_brief_from_manifest,
+    generate_downstream_handoff_manifest,
     load_raw_source_bundle,
 )
-from .core.fixture_loader import load_upstream_fixtures
+from .core.fixture_loader import load_from_handoff_manifest, load_upstream_fixtures
 from .utils.contract_validator import (
     validate_brief_file,
     validate_manifest_file,
@@ -92,24 +99,80 @@ def brief_cli():
          "ChunkSet, and RawSourceBundle from well-known filenames.",
 )
 @click.option(
+    "--upstream-handoff-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False),
+    help="Path to the upstream handoff package directory (Phase 3). "
+         "Reads handoff_manifest.json and loads declared artifacts. "
+         "Example: integration_fixtures/jwst/upstream/",
+)
+@click.option(
+    "--emit-handoff-manifest",
+    is_flag=True,
+    default=False,
+    help="Emit a downstream handoff_manifest.json to --output-dir after "
+         "generating the ResearchBrief. Intended for use with "
+         "--upstream-handoff-dir.",
+)
+@click.option(
     "--output-dir", "-o",
     default="output",
     type=click.Path(),
     help="Directory to write output files (default: output/).",
 )
-def generate(manifest, question, documents, chunks, graph, fixture_dir, output_dir):
+def generate(
+    manifest,
+    question,
+    documents,
+    chunks,
+    graph,
+    fixture_dir,
+    upstream_handoff_dir,
+    emit_handoff_manifest,
+    output_dir,
+):
     """Generate a ResearchBrief from upstream artifacts.
 
-    Provide --fixture-dir to auto-discover all upstream artifacts in a
-    directory, or supply individual artifact paths via --manifest,
-    --documents, and/or --graph.
+    Provide --upstream-handoff-dir (Phase 3) to consume the canonical
+    upstream handoff package from material-ingestion-pipeline, or use
+    --fixture-dir to auto-discover artifacts, or supply individual artifact
+    paths via --manifest, --documents, and/or --graph.
 
     Input priority:
       1. KnowledgeGraphPackage (--graph)  — richest structured input
       2. NormalizedDocumentSet (--documents) — document-level content
       3. RawSourceBundle (--manifest) — source metadata / seed entities
     """
-    # If --fixture-dir is given, discover and load upstream artifacts
+    upstream_source_run_id = None
+
+    # Phase 3: consume upstream handoff package
+    if upstream_handoff_dir:
+        fixtures = load_from_handoff_manifest(upstream_handoff_dir)
+        if not fixtures.has_any:
+            click.echo(
+                f"Error: no upstream artifacts found in {upstream_handoff_dir}",
+                err=True,
+            )
+            sys.exit(1)
+        click.echo(f"Loaded upstream handoff package from {upstream_handoff_dir}:")
+        if fixtures.graph_path:
+            graph = graph or fixtures.graph_path
+            click.echo(f"  KnowledgeGraphPackage: {fixtures.graph_path}")
+            if fixtures.graph:
+                upstream_source_run_id = fixtures.graph.source_run_id
+        if fixtures.documents_path:
+            documents = documents or fixtures.documents_path
+            click.echo(f"  NormalizedDocumentSet: {fixtures.documents_path}")
+        if fixtures.chunks_path:
+            chunks = chunks or fixtures.chunks_path
+            click.echo(f"  ChunkSet:              {fixtures.chunks_path}")
+        if fixtures.bundle_path:
+            manifest = manifest or fixtures.bundle_path
+            click.echo(f"  RawSourceBundle:       {fixtures.bundle_path}")
+        for warning in fixtures.warnings:
+            click.echo(f"  ⚠ {warning}")
+
+    # Phase 2A: auto-discover fixtures from a directory
     if fixture_dir:
         fixtures = load_upstream_fixtures(fixture_dir)
         if not fixtures.has_any:
@@ -137,8 +200,8 @@ def generate(manifest, question, documents, chunks, graph, fixture_dir, output_d
 
     if not manifest and not documents and not graph:
         click.echo(
-            "Error: at least one of --manifest, --documents, --graph, or "
-            "--fixture-dir must be provided.",
+            "Error: at least one of --manifest, --documents, --graph, "
+            "--fixture-dir, or --upstream-handoff-dir must be provided.",
             err=True,
         )
         sys.exit(1)
@@ -186,6 +249,21 @@ def generate(manifest, question, documents, chunks, graph, fixture_dir, output_d
         for err in errors:
             click.echo(f"  - {err}")
         sys.exit(1)
+
+    # Emit downstream handoff manifest if requested
+    if emit_handoff_manifest:
+        handoff_result = generate_downstream_handoff_manifest(
+            brief=result["brief"],
+            run_manifest=result["run_manifest"],
+            brief_path=result["brief_path"],
+            run_manifest_path=result["manifest_path"],
+            output_dir=output_dir,
+            upstream_source_run_id=upstream_source_run_id,
+        )
+        click.echo(
+            f"✓ Downstream handoff manifest written to: "
+            f"{handoff_result['handoff_manifest_path']}"
+        )
 
     # Summary
     brief = result["brief"]

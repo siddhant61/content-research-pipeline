@@ -22,6 +22,79 @@ All three repos share a versioned artifact contract:
 - **Schema documentation**: `contracts/schemas.md`
 - **Demo manifest**: `contracts/demo_manifest.md`
 
+## Phase 3 — Canonical Upstream/Downstream Handoff Integration
+
+Phase 3 makes this repo the authoritative middle transformer in the 3-pipeline chain.
+It consumes the canonical upstream handoff package from `material-ingestion-pipeline`
+(declared by a `handoff_manifest.json`) and emits the canonical downstream handoff
+package for `media-generation-pipeline`.
+
+### Integration Fixtures
+
+Canonical, stable handoff packages live under `integration_fixtures/jwst/`:
+
+```
+integration_fixtures/
+└── jwst/
+    ├── upstream/                          # Canonical upstream package (owned by material-ingestion)
+    │   ├── handoff_manifest.json          # Declares artifacts and regeneration commands
+    │   ├── KnowledgeGraphPackage.json     # KG (5 nodes, 4 edges)
+    │   ├── NormalizedDocumentSet.json     # 2 normalized documents
+    │   ├── ChunkSet.json                  # 6 text chunks
+    │   └── RawSourceBundle.json           # 6 source references
+    └── downstream/                        # Canonical downstream package (owned by this repo)
+        ├── handoff_manifest.json          # Declares outputs for media-generation
+        ├── ResearchBrief.json             # Synthesized research brief
+        └── RunManifest.json               # Provenance and metrics
+```
+
+### Consuming the Upstream Handoff Package (Phase 3 Path)
+
+```python
+from content_research_pipeline.core.fixture_loader import load_from_handoff_manifest
+from content_research_pipeline.core.brief_generator import (
+    generate_brief_from_fixtures,
+    generate_downstream_handoff_manifest,
+)
+
+# Load upstream handoff package (reads handoff_manifest.json)
+fixtures = load_from_handoff_manifest("integration_fixtures/jwst/upstream/")
+
+# Generate contract-valid ResearchBrief + RunManifest
+result = generate_brief_from_fixtures(fixtures, output_dir="output/")
+
+# Emit downstream handoff manifest for media-generation
+handoff = generate_downstream_handoff_manifest(
+    brief=result["brief"],
+    run_manifest=result["run_manifest"],
+    brief_path=result["brief_path"],
+    run_manifest_path=result["manifest_path"],
+    output_dir="output/",
+    upstream_source_run_id=fixtures.graph.source_run_id,
+)
+print(handoff["handoff_manifest_path"])   # output/handoff_manifest.json
+```
+
+### CLI — Phase 3 Canonical Integration Command
+
+```bash
+# Consume upstream handoff package and emit downstream package
+PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
+    --upstream-handoff-dir integration_fixtures/jwst/upstream/ \
+    --output-dir /tmp/jwst_downstream/ \
+    --emit-handoff-manifest
+```
+
+### Validate Canonical Downstream Fixtures
+
+```bash
+PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
+    --brief integration_fixtures/jwst/downstream/ResearchBrief.json
+
+PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
+    --run-manifest integration_fixtures/jwst/downstream/RunManifest.json
+```
+
 ## Phase 2B — Full Upstream Handoff Integration
 
 Phase 2B completes the upstream consumption path by adding ChunkSet support and
@@ -214,11 +287,14 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 + 2A + 2B tests
-pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py -v
+# Run all Phase 1 + 1.5 + 2A + 2B + Phase 3 tests (224 tests)
+PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py -v --no-cov
 
-# Run all working tests (Phase 1/1.5/2A/2B + config + prompts)
-pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_config.py tests/test_prompts.py -v
+# Run Phase 3 integration tests only
+PYTHONPATH=src pytest tests/test_phase3_integration.py -v --no-cov
+
+# Run all working tests (Phase 1/1.5/2A/2B/3 + config + prompts)
+PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_config.py tests/test_prompts.py -v --no-cov
 
 # Run all tests (requires full dependencies from requirements.txt)
 pytest tests/
@@ -283,7 +359,7 @@ content-research-pipeline/
 │   │   └── models.py              # Legacy pipeline models
 │   ├── core/
 │   │   ├── brief_generator.py     # ResearchBrief generation from artifacts
-│   │   ├── fixture_loader.py      # Upstream fixture discovery and loading (Phase 2A/2B)
+│   │   ├── fixture_loader.py      # Upstream fixture discovery and loading (Phase 2A/2B/3)
 │   │   ├── pipeline.py            # Legacy web search pipeline
 │   │   └── analysis.py            # NLP analysis module
 │   ├── utils/
@@ -297,6 +373,18 @@ content-research-pipeline/
 │   ├── shared_artifacts.json
 │   ├── schemas.md
 │   └── demo_manifest.md
+├── integration_fixtures/          # Canonical upstream/downstream handoff packages (Phase 3)
+│   └── jwst/
+│       ├── upstream/              # Upstream package (from material-ingestion-pipeline)
+│       │   ├── handoff_manifest.json
+│       │   ├── KnowledgeGraphPackage.json
+│       │   ├── NormalizedDocumentSet.json
+│       │   ├── ChunkSet.json
+│       │   └── RawSourceBundle.json
+│       └── downstream/            # Downstream package (for media-generation-pipeline)
+│           ├── handoff_manifest.json
+│           ├── ResearchBrief.json
+│           └── RunManifest.json
 ├── demo_data/                     # Canonical demo scaffold + upstream fixtures
 │   └── jwst_star_formation_early_universe_demo/
 │       ├── manifest.json                       # RawSourceBundle (upstream)
@@ -312,6 +400,7 @@ content-research-pipeline/
 │   ├── test_upstream_artifacts.py # Upstream artifact tests (Phase 1.5)
 │   ├── test_fixture_integration.py # Fixture-based integration tests (Phase 2A)
 │   ├── test_phase2b_handoff.py    # Upstream handoff integration tests (Phase 2B)
+│   ├── test_phase3_integration.py # Upstream/downstream handoff round-trip tests (Phase 3)
 │   ├── test_contract_validator.py # Validation tests
 │   ├── test_demo_contract.py      # Demo fixture contract tests
 │   └── ...                        # Legacy pipeline tests
