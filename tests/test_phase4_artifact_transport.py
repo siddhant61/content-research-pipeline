@@ -310,8 +310,7 @@ class TestWorkflowDiagnosticHardening:
 
     def test_resolve_step_verifies_download(self):
         """The resolve step must verify the download outcome."""
-        assert "Verify artifact download" in self.workflow_text or \
-            "steps.download-artifact.outcome" in self.workflow_text
+        assert "steps.download-artifact.outcome" in self.workflow_text
 
     def test_verify_step_checks_outcome(self):
         """The verification step must check the download step outcome."""
@@ -374,8 +373,9 @@ class TestNestedArtifactDirectoryResolution:
         assert "nested subdirectory layout" in self.workflow_text
 
     def test_resolve_sets_upstream_dir_output(self):
-        """Resolve step must set upstream_dir as a step output."""
-        assert "upstream_dir=" in self.workflow_text
+        """Resolve step must set upstream_dir as a GITHUB_OUTPUT step output."""
+        assert 'upstream_dir=' in self.workflow_text
+        assert 'GITHUB_OUTPUT' in self.workflow_text
 
     def test_generate_uses_resolve_upstream_output(self):
         """Generate step must reference the resolve_upstream step output."""
