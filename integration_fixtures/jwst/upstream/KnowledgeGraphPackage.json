@@ -4,7 +4,7 @@
   "artifact_id": "jwst-demo-kg-001",
   "created_at": "2026-03-30T00:00:00Z",
   "producer": "material-ingestion-pipeline",
-  "source_run_id": "ingest-run-001",
+  "source_run_id": "fixture-jwst-001",
   "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
   "graph_name": "jwst_star_formation_early_universe_demo",
   "nodes": [

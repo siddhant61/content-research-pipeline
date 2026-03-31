@@ -275,7 +275,7 @@ class TestGenerateDownstreamHandoffManifest:
             brief_path=result["brief_path"],
             run_manifest_path=result["manifest_path"],
             output_dir=str(tmp_path),
-            upstream_source_run_id="ingest-run-001",
+            upstream_source_run_id="fixture-jwst-001",
         )
         assert Path(hm_result["handoff_manifest_path"]).exists()
 
@@ -407,9 +407,9 @@ class TestGenerateDownstreamHandoffManifest:
             brief_path=result["brief_path"],
             run_manifest_path=result["manifest_path"],
             output_dir=str(tmp_path),
-            upstream_source_run_id="ingest-run-001",
+            upstream_source_run_id="fixture-jwst-001",
         )
-        assert hm_result["handoff_manifest"]["upstream_source_run_id"] == "ingest-run-001"
+        assert hm_result["handoff_manifest"]["upstream_source_run_id"] == "fixture-jwst-001"
 
     def test_artifact_ids_match_generated_artifacts(self, tmp_path):
         result = self._make_result(tmp_path)
@@ -500,7 +500,7 @@ class TestUpstreamToDownstreamRoundTrip:
         manifest = result["run_manifest"]
         prov = manifest.inputs.get("upstream_provenance", {})
         assert prov.get("graph_producer") == "material-ingestion-pipeline"
-        assert prov.get("graph_source_run_id") == "ingest-run-001"
+        assert prov.get("graph_source_run_id") == "fixture-jwst-001"
 
     def test_round_trip_source_count(self, tmp_path):
         fixtures = load_from_handoff_manifest(str(UPSTREAM_DIR))
@@ -587,7 +587,7 @@ class TestCanonicalDownstreamFixtures:
     def test_downstream_handoff_manifest_has_upstream_source_run_id(self):
         with open(DOWNSTREAM_DIR / "handoff_manifest.json") as f:
             hm = json.load(f)
-        assert hm.get("upstream_source_run_id") == "ingest-run-001"
+        assert hm.get("upstream_source_run_id") == "fixture-jwst-001"
 
     def test_downstream_research_brief_producer(self):
         with open(DOWNSTREAM_DIR / "ResearchBrief.json") as f:
@@ -617,3 +617,122 @@ class TestCanonicalDownstreamFixtures:
             hm = json.load(f)
         rb = next(a for a in hm["artifacts"] if a["artifact_type"] == "ResearchBrief")
         assert rb["required"] is True
+
+
+# ── Phase 3.5: exact upstream identity preservation ──────────────────────────
+
+class TestUpstreamIdentityPreservation:
+    """Phase 3.5: assert that downstream outputs preserve exact upstream package identity.
+
+    The canonical upstream source_run_id is ``fixture-jwst-001``.  All upstream
+    artifacts should carry this value, and all downstream outputs must reflect
+    the same upstream identity — no local placeholder values should remain.
+    """
+
+    def test_upstream_handoff_manifest_source_run_id(self):
+        """Upstream handoff_manifest.json declares fixture-jwst-001."""
+        with open(UPSTREAM_DIR / "handoff_manifest.json") as f:
+            hm = json.load(f)
+        assert hm["source_run_id"] == "fixture-jwst-001"
+
+    def test_upstream_kg_source_run_id(self):
+        """KnowledgeGraphPackage carries the canonical upstream source_run_id."""
+        with open(UPSTREAM_DIR / "KnowledgeGraphPackage.json") as f:
+            kg = json.load(f)
+        assert kg["source_run_id"] == "fixture-jwst-001"
+
+    def test_upstream_nds_source_run_id(self):
+        """NormalizedDocumentSet carries the canonical upstream source_run_id."""
+        with open(UPSTREAM_DIR / "NormalizedDocumentSet.json") as f:
+            nds = json.load(f)
+        assert nds["source_run_id"] == "fixture-jwst-001"
+
+    def test_upstream_chunks_source_run_id(self):
+        """ChunkSet carries the canonical upstream source_run_id."""
+        with open(UPSTREAM_DIR / "ChunkSet.json") as f:
+            cs = json.load(f)
+        assert cs["source_run_id"] == "fixture-jwst-001"
+
+    def test_upstream_bundle_producer_is_not_placeholder(self):
+        """RawSourceBundle producer should be material-ingestion-pipeline, not starter-pack."""
+        with open(UPSTREAM_DIR / "RawSourceBundle.json") as f:
+            b = json.load(f)
+        assert b["producer"] == "material-ingestion-pipeline"
+
+    def test_upstream_bundle_source_run_id(self):
+        """RawSourceBundle source_run_id should be fixture-jwst-001, not bootstrap."""
+        with open(UPSTREAM_DIR / "RawSourceBundle.json") as f:
+            b = json.load(f)
+        assert b["source_run_id"] == "fixture-jwst-001"
+
+    def test_handoff_source_run_id_loaded_from_manifest(self):
+        """UpstreamFixtures.handoff_source_run_id stores handoff manifest source_run_id."""
+        fixtures = load_from_handoff_manifest(str(UPSTREAM_DIR))
+        assert fixtures.handoff_source_run_id == "fixture-jwst-001"
+
+    def test_downstream_handoff_preserves_upstream_source_run_id(self):
+        """downstream handoff_manifest.json upstream_source_run_id == fixture-jwst-001."""
+        with open(DOWNSTREAM_DIR / "handoff_manifest.json") as f:
+            hm = json.load(f)
+        assert hm["upstream_source_run_id"] == "fixture-jwst-001"
+
+    def test_downstream_run_manifest_graph_source_run_id(self):
+        """RunManifest upstream_provenance graph_source_run_id == fixture-jwst-001."""
+        with open(DOWNSTREAM_DIR / "RunManifest.json") as f:
+            rm = json.load(f)
+        prov = rm["inputs"]["upstream_provenance"]
+        assert prov["graph_source_run_id"] == "fixture-jwst-001"
+
+    def test_downstream_run_manifest_documents_source_run_id(self):
+        """RunManifest upstream_provenance documents_source_run_id == fixture-jwst-001."""
+        with open(DOWNSTREAM_DIR / "RunManifest.json") as f:
+            rm = json.load(f)
+        prov = rm["inputs"]["upstream_provenance"]
+        assert prov["documents_source_run_id"] == "fixture-jwst-001"
+
+    def test_downstream_run_manifest_chunks_source_run_id(self):
+        """RunManifest upstream_provenance chunks_source_run_id == fixture-jwst-001."""
+        with open(DOWNSTREAM_DIR / "RunManifest.json") as f:
+            rm = json.load(f)
+        prov = rm["inputs"]["upstream_provenance"]
+        assert prov["chunks_source_run_id"] == "fixture-jwst-001"
+
+    def test_downstream_run_manifest_bundle_producer(self):
+        """RunManifest upstream_provenance bundle_producer == material-ingestion-pipeline."""
+        with open(DOWNSTREAM_DIR / "RunManifest.json") as f:
+            rm = json.load(f)
+        prov = rm["inputs"]["upstream_provenance"]
+        assert prov["bundle_producer"] == "material-ingestion-pipeline"
+
+    def test_downstream_run_manifest_bundle_source_run_id(self):
+        """RunManifest upstream_provenance bundle_source_run_id == fixture-jwst-001."""
+        with open(DOWNSTREAM_DIR / "RunManifest.json") as f:
+            rm = json.load(f)
+        prov = rm["inputs"]["upstream_provenance"]
+        assert prov["bundle_source_run_id"] == "fixture-jwst-001"
+
+    def test_round_trip_preserves_all_upstream_provenance(self, tmp_path):
+        """Full round-trip: all upstream_provenance values reflect fixture-jwst-001."""
+        fixtures = load_from_handoff_manifest(str(UPSTREAM_DIR))
+        result = generate_brief_from_fixtures(fixtures, output_dir=str(tmp_path))
+        prov = result["run_manifest"].inputs["upstream_provenance"]
+        assert prov["graph_source_run_id"] == "fixture-jwst-001"
+        assert prov["documents_source_run_id"] == "fixture-jwst-001"
+        assert prov["chunks_source_run_id"] == "fixture-jwst-001"
+        assert prov["bundle_source_run_id"] == "fixture-jwst-001"
+        assert prov["bundle_producer"] == "material-ingestion-pipeline"
+        assert prov["graph_producer"] == "material-ingestion-pipeline"
+
+    def test_round_trip_downstream_handoff_uses_handoff_source_run_id(self, tmp_path):
+        """Downstream handoff manifest uses the handoff manifest source_run_id."""
+        fixtures = load_from_handoff_manifest(str(UPSTREAM_DIR))
+        result = generate_brief_from_fixtures(fixtures, output_dir=str(tmp_path))
+        hm_result = generate_downstream_handoff_manifest(
+            brief=result["brief"],
+            run_manifest=result["run_manifest"],
+            brief_path=result["brief_path"],
+            run_manifest_path=result["manifest_path"],
+            output_dir=str(tmp_path),
+            upstream_source_run_id=fixtures.handoff_source_run_id,
+        )
+        assert hm_result["handoff_manifest"]["upstream_source_run_id"] == "fixture-jwst-001"
