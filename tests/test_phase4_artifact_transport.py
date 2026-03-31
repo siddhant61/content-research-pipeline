@@ -430,11 +430,11 @@ class TestStage2Simplification:
     def test_no_generate_step_references_step_output(self):
         """No CLI invocation line should reference steps.*.outputs for the
         upstream directory (the old fragile pattern)."""
-        import re
         cli_lines = [
             line for line in self.workflow_text.splitlines()
-            if "upstream-handoff-dir" in line and "brief_cli" not in line
+            if "--upstream-handoff-dir" in line
         ]
+        assert len(cli_lines) >= 2, "Expected at least 2 --upstream-handoff-dir lines"
         for line in cli_lines:
             assert "steps." not in line, (
                 f"CLI upstream-handoff-dir should use shell variable, not step output: {line}"
