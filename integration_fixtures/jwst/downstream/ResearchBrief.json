@@ -1,16 +1,16 @@
 {
   "artifact_type": "ResearchBrief",
   "schema_version": "1.0.0",
-  "artifact_id": "brief-9b94725efd83",
-  "created_at": "2026-03-31T08:34:07Z",
+  "artifact_id": "brief-5049d3d5a42b",
+  "created_at": "2026-03-31T10:18:44Z",
   "producer": "content-research-pipeline",
-  "source_run_id": "run-c97f8498547d",
+  "source_run_id": "run-89d537b1e843",
   "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
   "research_question": "What are the key aspects of: James Webb Space Telescope: telescope architecture, star formation, and the early universe?",
   "executive_summary": "This research brief covers 'James Webb Space Telescope: telescope architecture, star formation, and the early universe' based on 6 curated source(s). Key entities include James Webb Space Telescope, infrared astronomy, star formation, early universe, sunshield. The brief synthesizes available information to address: What are the key aspects of: James Webb Space Telescope: telescope architecture, star formation, and the early universe?",
   "key_findings": [
     {
-      "finding_id": "find-7b3683c943a5",
+      "finding_id": "find-c9823fc940cd",
       "claim": "James Webb Space Telescope operates_in infrared astronomy",
       "importance": "high",
       "confidence": 0.95,
@@ -19,7 +19,7 @@
       ]
     },
     {
-      "finding_id": "find-39b1e662c0c9",
+      "finding_id": "find-7babae4b0401",
       "claim": "James Webb Space Telescope studies star formation",
       "importance": "high",
       "confidence": 0.9,
@@ -28,7 +28,7 @@
       ]
     },
     {
-      "finding_id": "find-0b68cd40b928",
+      "finding_id": "find-983ea8b057a3",
       "claim": "James Webb Space Telescope studies early universe",
       "importance": "high",
       "confidence": 0.9,
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "finding_id": "find-e46f92fe28dc",
+      "finding_id": "find-60c591466403",
       "claim": "James Webb Space Telescope has_component sunshield",
       "importance": "high",
       "confidence": 0.95,
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "finding_id": "find-b90adf10959e",
+      "finding_id": "find-f0e47891bd26",
       "claim": "James Webb Space Telescope: A large infrared space telescope launched in 2021 to observe the universe in infrared wavelengths",
       "importance": "medium",
       "confidence": 0.7,
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "finding_id": "find-91d617446a0c",
+      "finding_id": "find-0613a3c51e9e",
       "claim": "infrared astronomy: Branch of astronomy that studies celestial objects in infrared radiation",
       "importance": "medium",
       "confidence": 0.7,
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "finding_id": "find-b0a96c41cd55",
+      "finding_id": "find-34926a98261d",
       "claim": "star formation: The process by which dense regions within molecular clouds collapse to form stars",
       "importance": "medium",
       "confidence": 0.7,
@@ -73,7 +73,7 @@
       ]
     },
     {
-      "finding_id": "find-6b53ef8c9ed6",
+      "finding_id": "find-0c0fcf8894ba",
       "claim": "early universe: The period of the universe from the Big Bang to the formation of the first galaxies",
       "importance": "medium",
       "confidence": 0.7,
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "finding_id": "find-0a493e667963",
+      "finding_id": "find-3f622b3287c2",
       "claim": "sunshield: A five-layer tennis-court-sized shield that protects the telescope from the Sun's heat",
       "importance": "medium",
       "confidence": 0.7,

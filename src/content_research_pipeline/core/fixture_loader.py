@@ -100,6 +100,10 @@ class UpstreamFixtures:
         documents_path: Path to the NDS fixture file, if found.
         chunks_path: Path to the ChunkSet fixture file, if found.
         bundle_path: Path to the manifest fixture file, if found.
+        handoff_source_run_id: The authoritative ``source_run_id`` declared
+            in the upstream ``handoff_manifest.json``.  This is the canonical
+            identifier for the upstream ingestion run and should be preserved
+            in downstream outputs.
         warnings: Human-readable notes about missing or degraded data.
     """
     fixture_dir: str
@@ -111,6 +115,7 @@ class UpstreamFixtures:
     documents_path: Optional[str] = None
     chunks_path: Optional[str] = None
     bundle_path: Optional[str] = None
+    handoff_source_run_id: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
 
     @property
@@ -281,6 +286,9 @@ def load_from_handoff_manifest(handoff_dir: str) -> "UpstreamFixtures":
         )
 
     result = UpstreamFixtures(fixture_dir=str(d))
+
+    # Preserve the authoritative upstream source_run_id from the handoff manifest.
+    result.handoff_source_run_id = manifest_data.get("source_run_id")
 
     _LOADERS: Dict[str, Any] = {
         "graph": (KnowledgeGraphPackage, "graph_path"),

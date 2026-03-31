@@ -158,8 +158,10 @@ def generate(
         if fixtures.graph_path:
             graph = graph or fixtures.graph_path
             click.echo(f"  KnowledgeGraphPackage: {fixtures.graph_path}")
-            if fixtures.graph:
-                upstream_source_run_id = fixtures.graph.source_run_id
+        # Use the authoritative upstream source_run_id from the handoff manifest.
+        upstream_source_run_id = fixtures.handoff_source_run_id
+        if not upstream_source_run_id and fixtures.graph:
+            upstream_source_run_id = fixtures.graph.source_run_id
         if fixtures.documents_path:
             documents = documents or fixtures.documents_path
             click.echo(f"  NormalizedDocumentSet: {fixtures.documents_path}")

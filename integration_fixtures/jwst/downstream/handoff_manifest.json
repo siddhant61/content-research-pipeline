@@ -5,20 +5,20 @@
   "produced_for": "media-generation-pipeline",
   "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
   "topic_slug": "jwst_star_formation_early_universe_demo",
-  "source_run_id": "run-c97f8498547d",
-  "created_at": "2026-03-31T08:34:07Z",
-  "upstream_source_run_id": "ingest-run-001",
+  "source_run_id": "run-89d537b1e843",
+  "created_at": "2026-03-31T10:18:44Z",
+  "upstream_source_run_id": "fixture-jwst-001",
   "artifacts": [
     {
       "artifact_type": "ResearchBrief",
-      "artifact_id": "brief-9b94725efd83",
+      "artifact_id": "brief-5049d3d5a42b",
       "path": "ResearchBrief.json",
       "required": true,
       "description": "Synthesized research brief: 9 findings, 5 entities, 6 sources"
     },
     {
       "artifact_type": "RunManifest",
-      "artifact_id": "manifest-72bfa8215a2d",
+      "artifact_id": "manifest-040e7377d1b6",
       "path": "RunManifest.json",
       "required": false,
       "description": "Provenance and metrics for this research run"
