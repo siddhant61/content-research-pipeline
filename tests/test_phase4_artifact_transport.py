@@ -419,9 +419,10 @@ class TestStage2Simplification:
         assert "id: resolve_and_generate" in self.workflow_text
 
     def test_cli_uses_shell_variable_not_step_output(self):
-        """The CLI must use the shell-local RESOLVED_DIR variable, not
-        a step output expression like steps.*.outputs.upstream_dir."""
-        assert '--upstream-handoff-dir "${RESOLVED_DIR}"' in self.workflow_text
+        """The artifact-mode CLI must use explicit file arguments referencing
+        the shell-local RESOLVED_DIR variable, not --upstream-handoff-dir
+        with a step output expression like steps.*.outputs.upstream_dir."""
+        assert '"${RESOLVED_DIR}/RawSourceBundle.json"' in self.workflow_text
 
     def test_fixture_cli_uses_shell_variable(self):
         """In fixture fallback, the CLI must use the shell-local FIXTURE_DIR variable."""
@@ -432,12 +433,15 @@ class TestStage2Simplification:
         upstream directory (the old fragile pattern)."""
         cli_lines = [
             line for line in self.workflow_text.splitlines()
-            if "--upstream-handoff-dir" in line
+            if "--upstream-handoff-dir" in line or "--manifest" in line or "--graph" in line
         ]
-        assert len(cli_lines) >= 2, "Expected at least 2 --upstream-handoff-dir lines"
+        assert len(cli_lines) >= 2, (
+            "Expected at least 2 CLI argument lines (explicit file args in artifact "
+            "mode + --upstream-handoff-dir in fixture mode)"
+        )
         for line in cli_lines:
             assert "steps." not in line, (
-                f"CLI upstream-handoff-dir should use shell variable, not step output: {line}"
+                f"CLI args should use shell variable, not step output: {line}"
             )
 
     def test_resolved_dir_tree_printed(self):
@@ -449,6 +453,127 @@ class TestStage2Simplification:
         assert "steps.resolve_and_generate.outputs.mode" in self.workflow_text
         assert "steps.resolve_and_generate.outputs.upstream_dir" in self.workflow_text
 
+
+# ── Explicit file input workflow (Stage 2 fix) ──────────────────────────────
+
+class TestExplicitFileInputWorkflow:
+    """Validate that the reusable-workflow artifact mode uses explicit file
+    arguments (--manifest, --documents, --graph) instead of the buggy
+    --upstream-handoff-dir path for CLI invocation."""
+
+    @pytest.fixture(autouse=True)
+    def _load_workflow(self):
+        self.workflow_text = WORKFLOW_PATH.read_text()
+
+    def test_artifact_mode_uses_explicit_manifest(self):
+        """Artifact mode must pass --manifest with RawSourceBundle.json."""
+        assert '"${RESOLVED_DIR}/RawSourceBundle.json"' in self.workflow_text
+
+    def test_artifact_mode_uses_explicit_documents(self):
+        """Artifact mode must pass --documents with NormalizedDocumentSet.json."""
+        assert '"${RESOLVED_DIR}/NormalizedDocumentSet.json"' in self.workflow_text
+
+    def test_artifact_mode_uses_explicit_graph(self):
+        """Artifact mode must pass --graph with KnowledgeGraphPackage.json."""
+        assert '"${RESOLVED_DIR}/KnowledgeGraphPackage.json"' in self.workflow_text
+
+    def test_artifact_mode_does_not_use_upstream_handoff_dir(self):
+        """Artifact mode must NOT use --upstream-handoff-dir for the resolved
+        directory — only the fixture fallback mode uses that flag."""
+        # Find all actual CLI argument lines (not comments) in the artifact mode section
+        in_artifact_mode = False
+        for line in self.workflow_text.splitlines():
+            if "Artifact mode" in line:
+                in_artifact_mode = True
+            if "Fixture fallback mode" in line:
+                in_artifact_mode = False
+            stripped = line.strip()
+            if (
+                in_artifact_mode
+                and "--upstream-handoff-dir" in stripped
+                and not stripped.startswith("#")
+            ):
+                pytest.fail(
+                    f"Artifact mode should not use --upstream-handoff-dir: {line}"
+                )
+
+    def test_artifact_mode_emits_handoff_manifest(self):
+        """Artifact mode must pass --emit-handoff-manifest."""
+        assert "--emit-handoff-manifest" in self.workflow_text
+
+    def test_debug_print_shows_explicit_files(self):
+        """Artifact mode must print which explicit files are being used."""
+        assert "Explicit artifact file inputs" in self.workflow_text
+
+    def test_upstream_source_run_id_extracted(self):
+        """Workflow must extract source_run_id from handoff_manifest.json."""
+        assert "UPSTREAM_RUN_ID" in self.workflow_text
+        assert "--upstream-source-run-id" in self.workflow_text
+
+    def test_fixture_mode_still_uses_handoff_dir(self):
+        """Fixture fallback mode must still use --upstream-handoff-dir."""
+        assert '--upstream-handoff-dir "${FIXTURE_DIR}"' in self.workflow_text
+
+
+class TestExplicitFileInputCLI:
+    """Validate that the CLI --upstream-source-run-id option works correctly
+    for provenance tracking when using explicit file arguments."""
+
+    def test_explicit_source_run_id_preserved_in_handoff(self, tmp_path):
+        """Explicit --upstream-source-run-id must appear in downstream handoff."""
+        fixtures = load_from_handoff_manifest(str(UPSTREAM_DIR))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        result = generate_brief_from_fixtures(fixtures, output_dir=str(out_dir))
+        # Generate downstream handoff with an explicit upstream_source_run_id
+        handoff = generate_downstream_handoff_manifest(
+            brief=result["brief"],
+            run_manifest=result["run_manifest"],
+            brief_path=result["brief_path"],
+            run_manifest_path=result["manifest_path"],
+            output_dir=str(out_dir),
+            upstream_source_run_id="explicit-test-run-42",
+        )
+        manifest = handoff["handoff_manifest"]
+        assert manifest["upstream_source_run_id"] == "explicit-test-run-42"
+
+    def test_explicit_file_args_produce_valid_brief(self, tmp_path):
+        """Using explicit --manifest, --documents, --graph via
+        generate_brief_from_artifacts must produce a valid ResearchBrief."""
+        from src.content_research_pipeline.core.brief_generator import (
+            generate_brief_from_artifacts,
+        )
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        result = generate_brief_from_artifacts(
+            manifest_path=str(UPSTREAM_DIR / "RawSourceBundle.json"),
+            documents_path=str(UPSTREAM_DIR / "NormalizedDocumentSet.json"),
+            graph_path=str(UPSTREAM_DIR / "KnowledgeGraphPackage.json"),
+            output_dir=str(out_dir),
+        )
+        is_valid, errors = validate_research_brief(
+            result["brief"].model_dump(), CONTRACT_PATH
+        )
+        assert is_valid, f"ResearchBrief contract errors: {errors}"
+
+    def test_explicit_file_args_produce_valid_run_manifest(self, tmp_path):
+        """Using explicit --manifest, --documents, --graph via
+        generate_brief_from_artifacts must produce a valid RunManifest."""
+        from src.content_research_pipeline.core.brief_generator import (
+            generate_brief_from_artifacts,
+        )
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        result = generate_brief_from_artifacts(
+            manifest_path=str(UPSTREAM_DIR / "RawSourceBundle.json"),
+            documents_path=str(UPSTREAM_DIR / "NormalizedDocumentSet.json"),
+            graph_path=str(UPSTREAM_DIR / "KnowledgeGraphPackage.json"),
+            output_dir=str(out_dir),
+        )
+        is_valid, errors = validate_run_manifest(
+            result["run_manifest"].model_dump(), CONTRACT_PATH
+        )
+        assert is_valid, f"RunManifest contract errors: {errors}"
 
 
 class TestNestedLayoutPythonLoading:

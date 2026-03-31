@@ -112,7 +112,15 @@ def brief_cli():
     default=False,
     help="Emit a downstream handoff_manifest.json to --output-dir after "
          "generating the ResearchBrief. Intended for use with "
-         "--upstream-handoff-dir.",
+         "--upstream-handoff-dir or explicit artifact file inputs.",
+)
+@click.option(
+    "--upstream-source-run-id",
+    "upstream_source_run_id_opt",
+    default=None,
+    help="Explicit upstream source_run_id for provenance tracking. "
+         "Used when bypassing --upstream-handoff-dir with explicit "
+         "file arguments (--manifest, --documents, --graph).",
 )
 @click.option(
     "--output-dir", "-o",
@@ -129,6 +137,7 @@ def generate(
     fixture_dir,
     upstream_handoff_dir,
     emit_handoff_manifest,
+    upstream_source_run_id_opt,
     output_dir,
 ):
     """Generate a ResearchBrief from upstream artifacts.
@@ -144,6 +153,11 @@ def generate(
       3. RawSourceBundle (--manifest) — source metadata / seed entities
     """
     upstream_source_run_id = None
+
+    # Accept explicit upstream-source-run-id (e.g. from shell-extracted
+    # handoff_manifest.json when using explicit file arguments).
+    if upstream_source_run_id_opt:
+        upstream_source_run_id = upstream_source_run_id_opt
 
     # Phase 3: consume upstream handoff package
     if upstream_handoff_dir:
