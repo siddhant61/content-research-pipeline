@@ -336,3 +336,117 @@ class TestWorkflowDiagnosticHardening:
         assert dispatch is None or dispatch == {}, (
             f"workflow_dispatch should be bare, got: {dispatch}"
         )
+
+
+# ── Nested artifact directory resolution (Phase 4.1 fix) ────────────────────
+
+class TestNestedArtifactDirectoryResolution:
+    """Validate that the workflow robustly handles both direct and nested
+    artifact extraction layouts from actions/download-artifact."""
+
+    @pytest.fixture(autouse=True)
+    def _load_workflow(self):
+        self.workflow_text = WORKFLOW_PATH.read_text()
+
+    def test_post_download_debug_step_present(self):
+        """A debug step after download must inspect the downloaded layout."""
+        assert "Debug downloaded artifact layout" in self.workflow_text
+
+    def test_post_download_debug_runs_ls_recursive(self):
+        """The post-download debug step must run ls -R on the download path."""
+        assert "ls -R /tmp/upstream-handoff" in self.workflow_text
+
+    def test_post_download_debug_prints_artifact_name(self):
+        """The post-download debug step must print the upstream_artifact_name."""
+        assert "upstream_artifact_name:" in self.workflow_text
+
+    def test_verify_step_has_id(self):
+        """The verify step must have an id to set outputs."""
+        assert "id: verify-artifact" in self.workflow_text
+
+    def test_verify_checks_root_first(self):
+        """Verify step must first check for handoff_manifest.json at root."""
+        assert "handoff_manifest.json found directly" in self.workflow_text
+
+    def test_verify_checks_nested_subdirectory(self):
+        """Verify step must check for handoff_manifest.json in child directories."""
+        assert "nested subdirectory layout" in self.workflow_text
+
+    def test_verify_sets_resolved_artifact_dir_output(self):
+        """Verify step must set resolved_artifact_dir as a step output."""
+        assert "resolved_artifact_dir=" in self.workflow_text
+
+    def test_resolve_uses_verified_dir(self):
+        """Resolve step must reference the verified artifact directory output."""
+        assert "steps.verify-artifact.outputs.resolved_artifact_dir" in self.workflow_text
+
+    def test_error_includes_directory_tree(self):
+        """Error paths must include 'Directory tree:' for debugging."""
+        assert "Directory tree:" in self.workflow_text
+
+    def test_error_on_missing_manifest_mentions_child_dirs(self):
+        """Error message must mention both root and child directories were checked."""
+        assert "checked root and all child directories" in self.workflow_text
+
+    def test_error_on_multiple_nested_dirs(self):
+        """Workflow must error if multiple child dirs contain handoff_manifest.json."""
+        assert "Multiple nested directories" in self.workflow_text
+
+
+class TestNestedLayoutPythonLoading:
+    """Verify that load_from_handoff_manifest works when the upstream
+    artifacts live inside a nested subdirectory (simulating the layout
+    produced when download-artifact nests under a child directory)."""
+
+    def test_load_from_nested_subdirectory(self, tmp_path):
+        """Simulate nested layout: /tmp/upstream-handoff/jwst-upstream-handoff/..."""
+        outer = tmp_path / "upstream-handoff"
+        nested = outer / "jwst-upstream-handoff"
+        _copy_upstream_to(nested)
+        # The Python loader should work when pointed at the nested dir
+        fixtures = load_from_handoff_manifest(str(nested))
+        assert fixtures.has_any
+        assert fixtures.graph is not None
+        assert fixtures.handoff_source_run_id == "fixture-jwst-001"
+
+    def test_nested_paths_reference_nested_dir(self, tmp_path):
+        """Artifact paths should reference the nested directory."""
+        outer = tmp_path / "upstream-handoff"
+        nested = outer / "jwst-upstream-handoff"
+        _copy_upstream_to(nested)
+        fixtures = load_from_handoff_manifest(str(nested))
+        for attr in ("graph_path", "documents_path", "chunks_path", "bundle_path"):
+            path_val = getattr(fixtures, attr)
+            assert path_val is not None
+            assert str(nested) in path_val
+
+    def test_nested_brief_generation(self, tmp_path):
+        """Full brief generation from a nested directory should succeed."""
+        outer = tmp_path / "upstream-handoff"
+        nested = outer / "jwst-upstream-handoff"
+        _copy_upstream_to(nested)
+        fixtures = load_from_handoff_manifest(str(nested))
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        result = generate_brief_from_fixtures(fixtures, output_dir=str(out_dir))
+        assert Path(result["brief_path"]).exists()
+        assert Path(result["manifest_path"]).exists()
+        is_valid, errors = validate_research_brief(
+            result["brief"].model_dump(), CONTRACT_PATH
+        )
+        assert is_valid, f"ResearchBrief contract errors: {errors}"
+
+    def test_outer_dir_without_manifest_falls_back(self, tmp_path):
+        """Loading from the outer directory (no handoff_manifest.json at root)
+        should fall back to auto-discovery, which finds nothing since the
+        artifacts are in the nested subdirectory."""
+        outer = tmp_path / "upstream-handoff"
+        nested = outer / "jwst-upstream-handoff"
+        _copy_upstream_to(nested)
+        # The outer dir has no handoff_manifest.json and no well-known filenames
+        fixtures = load_from_handoff_manifest(str(outer))
+        # Auto-discovery won't find artifacts because they're inside a subdir
+        # that doesn't match the well-known filenames
+        assert fixtures.graph is None
+        assert fixtures.documents is None
+        assert fixtures.handoff_source_run_id is None

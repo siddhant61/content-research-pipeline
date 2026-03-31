@@ -127,8 +127,35 @@ When called as a reusable workflow by an orchestrator (e.g. `pipeline-integratio
 
 The workflow resolves the upstream directory as follows:
 1. If `upstream_artifact_name` is provided, download the named artifact into `/tmp/upstream-handoff`.
-2. If the downloaded directory contains a valid `handoff_manifest.json`, use it as the upstream input.
-3. Otherwise, fall back to the committed `integration_fixtures/jwst/upstream/` directory.
+2. Check for `handoff_manifest.json` directly in `/tmp/upstream-handoff/` (direct layout).
+3. If not found at root, check whether exactly one child directory contains `handoff_manifest.json` (nested layout) and use that directory instead.
+4. If no valid handoff package is found in either layout, the workflow fails with a clear error and prints the full directory tree for debugging.
+5. If `upstream_artifact_name` is not provided or empty, fall back to the committed `integration_fixtures/jwst/upstream/` directory.
+
+**Supported artifact extraction layouts:**
+
+`actions/download-artifact@v4` may produce either of these layouts depending on how the upstream artifact was uploaded:
+
+```
+# Layout A — Direct (files extracted at root)
+/tmp/upstream-handoff/
+├── handoff_manifest.json
+├── KnowledgeGraphPackage.json
+├── NormalizedDocumentSet.json
+├── ChunkSet.json
+└── RawSourceBundle.json
+
+# Layout B — Nested (files inside a child directory)
+/tmp/upstream-handoff/
+└── jwst-upstream-handoff/
+    ├── handoff_manifest.json
+    ├── KnowledgeGraphPackage.json
+    ├── NormalizedDocumentSet.json
+    ├── ChunkSet.json
+    └── RawSourceBundle.json
+```
+
+The workflow automatically detects and resolves both layouts.
 
 The `source_run_id` from the downloaded artifact's `handoff_manifest.json` is preserved through the entire downstream output chain (ResearchBrief → RunManifest → downstream `handoff_manifest.json`).
 
@@ -350,10 +377,10 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (261 tests: 239 prior + 22 Phase 4)
+# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (286 tests: 271 prior + 15 Phase 4.1 fix)
 PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py -v --no-cov
 
-# Run Phase 4 artifact-transport tests only
+# Run Phase 4 artifact-transport tests only (includes nested layout resolution tests)
 PYTHONPATH=src pytest tests/test_phase4_artifact_transport.py -v --no-cov
 
 # Run Phase 3 integration tests only
