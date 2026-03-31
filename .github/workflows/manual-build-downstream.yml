@@ -143,12 +143,41 @@ jobs:
           echo "--- Resolved directory tree ---"
           ls -R "${RESOLVED_DIR}"
 
-          # Run CLI with resolved directory (same shell — no step-output plumbing)
+          # ── Extract upstream source_run_id from handoff_manifest ───
+          UPSTREAM_RUN_ID=""
+          if [ -f "${RESOLVED_DIR}/handoff_manifest.json" ]; then
+            UPSTREAM_RUN_ID=$(python -c "
+          import json, pathlib
+          m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text())
+          print(m.get('source_run_id', ''))
+          ")
+          fi
+
+          # ── Debug: show explicit artifact files being used ─────────
+          echo "::group::Explicit artifact file inputs"
+          echo "  --manifest  : ${RESOLVED_DIR}/RawSourceBundle.json"
+          echo "  --documents : ${RESOLVED_DIR}/NormalizedDocumentSet.json"
+          echo "  --graph     : ${RESOLVED_DIR}/KnowledgeGraphPackage.json"
+          echo "  --output-dir: ${OUTPUT_DIR}"
+          echo "  --upstream-source-run-id: ${UPSTREAM_RUN_ID:-<not set>}"
+          echo "::endgroup::"
+
+          # Run CLI with explicit artifact files (bypasses --upstream-handoff-dir loader)
           rm -rf "${OUTPUT_DIR}"/*
-          PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
-              --upstream-handoff-dir "${RESOLVED_DIR}" \
-              --output-dir "${OUTPUT_DIR}" \
-              --emit-handoff-manifest
+
+          CLI_ARGS="generate"
+          [ -f "${RESOLVED_DIR}/RawSourceBundle.json" ] && \
+            CLI_ARGS="${CLI_ARGS} --manifest ${RESOLVED_DIR}/RawSourceBundle.json"
+          [ -f "${RESOLVED_DIR}/NormalizedDocumentSet.json" ] && \
+            CLI_ARGS="${CLI_ARGS} --documents ${RESOLVED_DIR}/NormalizedDocumentSet.json"
+          [ -f "${RESOLVED_DIR}/KnowledgeGraphPackage.json" ] && \
+            CLI_ARGS="${CLI_ARGS} --graph ${RESOLVED_DIR}/KnowledgeGraphPackage.json"
+          [ -n "${UPSTREAM_RUN_ID}" ] && \
+            CLI_ARGS="${CLI_ARGS} --upstream-source-run-id ${UPSTREAM_RUN_ID}"
+          CLI_ARGS="${CLI_ARGS} --output-dir ${OUTPUT_DIR} --emit-handoff-manifest"
+
+          echo "Running: PYTHONPATH=src python -m content_research_pipeline.brief_cli ${CLI_ARGS}"
+          PYTHONPATH=src python -m content_research_pipeline.brief_cli ${CLI_ARGS}
 
         # ── Fixture fallback mode ──────────────────────────────────
         else

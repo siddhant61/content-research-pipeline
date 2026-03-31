@@ -157,6 +157,8 @@ The workflow resolves the upstream directory as follows:
 
 The workflow automatically detects and resolves both layouts.
 
+> **Note (Stage 2 workaround):** The orchestration artifact mode currently uses **explicit file arguments** (`--manifest`, `--documents`, `--graph`) rather than `--upstream-handoff-dir` when invoking the CLI. This bypasses a known issue in the handoff-directory loader where the CLI fails to discover artifacts in the download directory even though the files are present. The `source_run_id` is extracted from `handoff_manifest.json` in the shell and passed via `--upstream-source-run-id`. The local-fixture mode (workflow_dispatch) continues to use `--upstream-handoff-dir` normally.
+
 The `source_run_id` from the downloaded artifact's `handoff_manifest.json` is preserved through the entire downstream output chain (ResearchBrief → RunManifest → downstream `handoff_manifest.json`).
 
 **How to call as a reusable workflow (with upstream artifact):**
@@ -377,8 +379,8 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (286 tests: 271 prior + 15 Phase 4.1 fix)
-PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py -v --no-cov
+# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (305 tests: 286 prior + 11 Stage 2 explicit-file + 8 CLI tests)
+PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py -v
 
 # Run Phase 4 artifact-transport tests only (includes nested layout resolution tests)
 PYTHONPATH=src pytest tests/test_phase4_artifact_transport.py -v --no-cov
