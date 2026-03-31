@@ -262,14 +262,16 @@ class TestWorkflowYAMLStructure:
     def test_download_is_conditional(self):
         assert "inputs.upstream_artifact_name" in self.workflow_text
 
-    def test_resolve_upstream_step_present(self):
-        assert "resolve_upstream" in self.workflow_text
+    def test_resolve_and_generate_step_present(self):
+        assert "resolve_and_generate" in self.workflow_text
 
     def test_fixture_fallback_path_in_resolve(self):
         assert "integration_fixtures/jwst/upstream/" in self.workflow_text
 
-    def test_upstream_dir_output_used_in_generate(self):
-        assert "steps.resolve_upstream.outputs.upstream_dir" in self.workflow_text
+    def test_cli_invoked_in_resolve_step(self):
+        """CLI generate must be invoked in the same shell step as directory resolution."""
+        assert "upstream-handoff-dir" in self.workflow_text
+        assert "brief_cli generate" in self.workflow_text
 
     def test_upload_artifact_step_present(self):
         assert "actions/upload-artifact@v4" in self.workflow_text
@@ -362,7 +364,7 @@ class TestNestedArtifactDirectoryResolution:
 
     def test_resolve_step_has_id(self):
         """The resolve step must have an id to set outputs."""
-        assert "id: resolve_upstream" in self.workflow_text
+        assert "id: resolve_and_generate" in self.workflow_text
 
     def test_verify_checks_root_first(self):
         """Verify step must first check for handoff_manifest.json at root."""
@@ -377,9 +379,9 @@ class TestNestedArtifactDirectoryResolution:
         assert 'upstream_dir=' in self.workflow_text
         assert 'GITHUB_OUTPUT' in self.workflow_text
 
-    def test_generate_uses_resolve_upstream_output(self):
-        """Generate step must reference the resolve_upstream step output."""
-        assert "steps.resolve_upstream.outputs.upstream_dir" in self.workflow_text
+    def test_cli_invoked_with_resolved_dir_variable(self):
+        """CLI must use the shell-resolved RESOLVED_DIR variable, not a step output."""
+        assert '"${RESOLVED_DIR}"' in self.workflow_text or "'${RESOLVED_DIR}'" in self.workflow_text
 
     def test_error_includes_directory_tree(self):
         """Error paths must include 'Directory tree:' for debugging."""
@@ -392,6 +394,61 @@ class TestNestedArtifactDirectoryResolution:
     def test_error_on_multiple_nested_dirs(self):
         """Workflow must error if multiple child dirs contain handoff_manifest.json."""
         assert "Multiple nested directories" in self.workflow_text
+
+
+# ── Stage 2 simplification (combined resolve + generate) ────────────────────
+
+class TestStage2Simplification:
+    """Validate that directory resolution and CLI invocation happen in a single
+    shell step, eliminating step-output/path-plumbing fragility."""
+
+    @pytest.fixture(autouse=True)
+    def _load_workflow(self):
+        self.workflow_text = WORKFLOW_PATH.read_text()
+
+    def test_no_separate_generate_step(self):
+        """There must be no standalone 'Generate downstream handoff package' step."""
+        assert "Generate downstream handoff package" not in self.workflow_text
+
+    def test_combined_step_named(self):
+        """The combined step must be named to indicate both resolve and generate."""
+        assert "Resolve upstream and generate downstream handoff" in self.workflow_text
+
+    def test_combined_step_has_id(self):
+        """The combined step must have an id for output references."""
+        assert "id: resolve_and_generate" in self.workflow_text
+
+    def test_cli_uses_shell_variable_not_step_output(self):
+        """The CLI must use the shell-local RESOLVED_DIR variable, not
+        a step output expression like steps.*.outputs.upstream_dir."""
+        assert '--upstream-handoff-dir "${RESOLVED_DIR}"' in self.workflow_text
+
+    def test_fixture_cli_uses_shell_variable(self):
+        """In fixture fallback, the CLI must use the shell-local FIXTURE_DIR variable."""
+        assert '--upstream-handoff-dir "${FIXTURE_DIR}"' in self.workflow_text
+
+    def test_no_generate_step_references_step_output(self):
+        """No CLI invocation line should reference steps.*.outputs for the
+        upstream directory (the old fragile pattern)."""
+        import re
+        cli_lines = [
+            line for line in self.workflow_text.splitlines()
+            if "upstream-handoff-dir" in line and "brief_cli" not in line
+        ]
+        for line in cli_lines:
+            assert "steps." not in line, (
+                f"CLI upstream-handoff-dir should use shell variable, not step output: {line}"
+            )
+
+    def test_resolved_dir_tree_printed(self):
+        """The combined step must print the resolved directory tree for debugging."""
+        assert "Resolved directory tree" in self.workflow_text
+
+    def test_report_step_references_combined_step(self):
+        """The report step must reference the combined step's outputs."""
+        assert "steps.resolve_and_generate.outputs.mode" in self.workflow_text
+        assert "steps.resolve_and_generate.outputs.upstream_dir" in self.workflow_text
+
 
 
 class TestNestedLayoutPythonLoading:

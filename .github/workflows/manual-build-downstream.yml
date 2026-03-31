@@ -72,12 +72,13 @@ jobs:
         ls -R /tmp/upstream-handoff || echo "(directory does not exist)"
         echo "::endgroup::"
 
-    # ── Resolve upstream handoff directory ────────────────────────────
-    - name: Resolve upstream handoff directory
-      id: resolve_upstream
+    # ── Resolve upstream directory + generate (single step) ──────────
+    - name: Resolve upstream and generate downstream handoff
+      id: resolve_and_generate
       run: |
         ARTIFACT_DIR="/tmp/upstream-handoff"
         FIXTURE_DIR="integration_fixtures/jwst/upstream/"
+        OUTPUT_DIR="integration_fixtures/jwst/downstream/"
         echo "Fallback fixture path: ${FIXTURE_DIR}"
 
         # ── Artifact mode ──────────────────────────────────────────
@@ -130,30 +131,38 @@ jobs:
             fi
           fi
 
-          echo "upstream_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=artifact" >> "$GITHUB_OUTPUT"
-          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}' from ${RESOLVED_DIR}"
+          echo "upstream_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
+          echo "::notice ::Using downloaded upstream artifact '${RESOLVED_DIR}'"
           python -c "
         import json, pathlib
         m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text())
         print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
         "
 
+          echo "--- Resolved directory tree ---"
+          ls -R "${RESOLVED_DIR}"
+
+          # Run CLI with resolved directory (same shell — no step-output plumbing)
+          rm -rf "${OUTPUT_DIR}"/*
+          PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
+              --upstream-handoff-dir "${RESOLVED_DIR}" \
+              --output-dir "${OUTPUT_DIR}" \
+              --emit-handoff-manifest
+
         # ── Fixture fallback mode ──────────────────────────────────
         else
           echo "Artifact download path: (none)"
-          echo "upstream_dir=${FIXTURE_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=fixture" >> "$GITHUB_OUTPUT"
+          echo "upstream_dir=${FIXTURE_DIR}" >> "$GITHUB_OUTPUT"
           echo "::notice ::Using committed local fixtures (${FIXTURE_DIR})"
-        fi
 
-    - name: Generate downstream handoff package
-      run: |
-        rm -rf integration_fixtures/jwst/downstream/*
-        PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
-            --upstream-handoff-dir "${{ steps.resolve_upstream.outputs.upstream_dir }}" \
-            --output-dir integration_fixtures/jwst/downstream/ \
-            --emit-handoff-manifest
+          rm -rf "${OUTPUT_DIR}"/*
+          PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
+              --upstream-handoff-dir "${FIXTURE_DIR}" \
+              --output-dir "${OUTPUT_DIR}" \
+              --emit-handoff-manifest
+        fi
 
     - name: Validate outputs
       run: |
@@ -167,8 +176,8 @@ jobs:
     - name: Report handoff mode
       run: |
         echo "## Downstream Handoff Build" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Mode:** ${{ steps.resolve_upstream.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Upstream dir:** ${{ steps.resolve_upstream.outputs.upstream_dir }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Mode:** ${{ steps.resolve_and_generate.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Upstream dir:** ${{ steps.resolve_and_generate.outputs.upstream_dir }}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload downstream handoff artifact
       uses: actions/upload-artifact@v4
