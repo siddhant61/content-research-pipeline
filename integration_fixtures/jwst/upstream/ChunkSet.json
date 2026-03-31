@@ -1,0 +1,96 @@
+{
+  "artifact_type": "ChunkSet",
+  "schema_version": "1.0.0",
+  "artifact_id": "jwst-demo-chunks-001",
+  "created_at": "2026-03-30T02:00:00Z",
+  "producer": "material-ingestion-pipeline",
+  "source_run_id": "ingest-run-001",
+  "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
+  "chunking_strategy": "sentence-window",
+  "chunks": [
+    {
+      "chunk_id": "chunk-overview-01",
+      "document_id": "doc-overview",
+      "source_id": "jwst-nasa-mission-overview",
+      "text": "The James Webb Space Telescope (JWST) is the largest and most powerful space telescope ever built.",
+      "token_count": 19,
+      "char_count": 97,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-overview-intro",
+        "chunk_index": 0
+      }
+    },
+    {
+      "chunk_id": "chunk-overview-02",
+      "document_id": "doc-overview",
+      "source_id": "jwst-nasa-mission-overview",
+      "text": "It was launched on December 25, 2021, and observes the universe primarily in infrared light.",
+      "token_count": 18,
+      "char_count": 91,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-overview-intro",
+        "chunk_index": 1
+      }
+    },
+    {
+      "chunk_id": "chunk-overview-03",
+      "document_id": "doc-overview",
+      "source_id": "jwst-nasa-mission-overview",
+      "text": "Webb is designed to answer outstanding questions about the Universe and to make breakthrough discoveries in all fields of astronomy.",
+      "token_count": 25,
+      "char_count": 131,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-overview-intro",
+        "chunk_index": 2
+      }
+    },
+    {
+      "chunk_id": "chunk-factsheet-01",
+      "document_id": "doc-factsheet",
+      "source_id": "jwst-nasa-fact-sheet",
+      "text": "Webb's primary mirror is 6.5 meters in diameter, made of 18 gold-coated beryllium segments.",
+      "token_count": 19,
+      "char_count": 92,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-factsheet-mirror",
+        "chunk_index": 0
+      }
+    },
+    {
+      "chunk_id": "chunk-factsheet-02",
+      "document_id": "doc-factsheet",
+      "source_id": "jwst-nasa-fact-sheet",
+      "text": "The sunshield is the size of a tennis court and has five layers.",
+      "token_count": 14,
+      "char_count": 63,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-factsheet-sunshield",
+        "chunk_index": 0
+      }
+    },
+    {
+      "chunk_id": "chunk-factsheet-03",
+      "document_id": "doc-factsheet",
+      "source_id": "jwst-nasa-fact-sheet",
+      "text": "Webb orbits the Sun at the second Lagrange point (L2), approximately 1.5 million kilometers from Earth.",
+      "token_count": 20,
+      "char_count": 103,
+      "embedding_model": "text-embedding-ada-002",
+      "embedding_vector_ref": null,
+      "metadata": {
+        "section_id": "sec-factsheet-mirror",
+        "chunk_index": 1
+      }
+    }
+  ]
+}

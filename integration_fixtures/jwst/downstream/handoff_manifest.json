@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "handoff_type": "downstream",
+  "pipeline": "content-research-pipeline",
+  "produced_for": "media-generation-pipeline",
+  "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
+  "topic_slug": "jwst_star_formation_early_universe_demo",
+  "source_run_id": "run-c97f8498547d",
+  "created_at": "2026-03-31T08:34:07Z",
+  "upstream_source_run_id": "ingest-run-001",
+  "artifacts": [
+    {
+      "artifact_type": "ResearchBrief",
+      "artifact_id": "brief-9b94725efd83",
+      "path": "ResearchBrief.json",
+      "required": true,
+      "description": "Synthesized research brief: 9 findings, 5 entities, 6 sources"
+    },
+    {
+      "artifact_type": "RunManifest",
+      "artifact_id": "manifest-72bfa8215a2d",
+      "path": "RunManifest.json",
+      "required": false,
+      "description": "Provenance and metrics for this research run"
+    }
+  ],
+  "regeneration_command": "PYTHONPATH=src python -m content_research_pipeline.brief_cli generate --upstream-handoff-dir integration_fixtures/jwst/upstream/ --output-dir /tmp/jwst_downstream/ --emit-handoff-manifest",
+  "validation_command": "PYTHONPATH=src python -m content_research_pipeline.brief_cli validate --brief integration_fixtures/jwst/downstream/ResearchBrief.json",
+  "known_limitations": [
+    "Brief is synthesized from fixture artifacts; no live web retrieval was performed.",
+    "Embedding vectors are not included in the upstream ChunkSet.",
+    "ResearchBrief.timeline may be empty when no dated events are present in the KG.",
+    "open_questions and recommended_angles are generated from KG structure, not LLM inference."
+  ]
+}

@@ -880,3 +880,103 @@ def generate_brief_from_fixtures(
         "manifest_path": str(manifest_path_out),
         "fixtures": fixtures,
     }
+
+
+def generate_downstream_handoff_manifest(
+    brief: ResearchBrief,
+    run_manifest: RunManifest,
+    brief_path: str,
+    run_manifest_path: str,
+    output_dir: str,
+    topic_slug: Optional[str] = None,
+    upstream_source_run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Generate the canonical downstream handoff manifest for media-generation.
+
+    The downstream ``handoff_manifest.json`` tells media-generation-pipeline
+    which files to consume, their stable artifact IDs, how to regenerate and
+    validate them, and any known limitations.
+
+    Args:
+        brief: The generated ResearchBrief object.
+        run_manifest: The generated RunManifest object.
+        brief_path: Absolute or relative path to the written ResearchBrief JSON.
+        run_manifest_path: Absolute or relative path to the written RunManifest JSON.
+        output_dir: Directory where the handoff manifest should be written.
+        topic_slug: Optional topic slug; derived from brief.topic if not given.
+        upstream_source_run_id: Optional source_run_id from the upstream
+            handoff package; used to declare provenance lineage.
+
+    Returns:
+        Dict with keys ``'handoff_manifest'`` (the manifest dict) and
+        ``'handoff_manifest_path'`` (path to the written file).
+    """
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    if topic_slug is None:
+        topic_slug = (
+            brief.topic.replace(" ", "_").lower()[:80]
+            if brief.topic
+            else "research"
+        )
+
+    brief_rel = Path(brief_path).name
+    run_manifest_rel = Path(run_manifest_path).name
+
+    manifest_dict: Dict[str, Any] = {
+        "schema_version": "1.0.0",
+        "handoff_type": "downstream",
+        "pipeline": "content-research-pipeline",
+        "produced_for": "media-generation-pipeline",
+        "topic": brief.topic,
+        "topic_slug": topic_slug,
+        "source_run_id": brief.source_run_id,
+        "created_at": brief.created_at,
+        "upstream_source_run_id": upstream_source_run_id,
+        "artifacts": [
+            {
+                "artifact_type": "ResearchBrief",
+                "artifact_id": brief.artifact_id,
+                "path": brief_rel,
+                "required": True,
+                "description": (
+                    f"Synthesized research brief: {len(brief.key_findings)} findings, "
+                    f"{len(brief.entities)} entities, "
+                    f"{len(brief.source_index)} sources"
+                ),
+            },
+            {
+                "artifact_type": "RunManifest",
+                "artifact_id": run_manifest.artifact_id,
+                "path": run_manifest_rel,
+                "required": False,
+                "description": "Provenance and metrics for this research run",
+            },
+        ],
+        "regeneration_command": (
+            "python -m content_research_pipeline.brief_cli generate "
+            f"--upstream-handoff-dir integration_fixtures/jwst/upstream/ "
+            f"--output-dir {output_dir}"
+        ),
+        "validation_command": (
+            f"python -m content_research_pipeline.brief_cli validate "
+            f"--brief {out / brief_rel}"
+        ),
+        "known_limitations": [
+            "Brief is synthesized from fixture artifacts; no live web retrieval was performed.",
+            "Embedding vectors are not included in the upstream ChunkSet.",
+            "ResearchBrief.timeline may be empty when no dated events are present in the KG.",
+            "open_questions and recommended_angles are generated from KG structure, not LLM inference.",
+        ],
+    }
+
+    handoff_path = out / "handoff_manifest.json"
+    handoff_path.write_text(
+        json.dumps(manifest_dict, indent=2), encoding="utf-8"
+    )
+
+    return {
+        "handoff_manifest": manifest_dict,
+        "handoff_manifest_path": str(handoff_path),
+    }
