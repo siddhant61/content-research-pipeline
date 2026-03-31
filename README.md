@@ -377,7 +377,7 @@ python -m content_research_pipeline.brief_cli validate --run-manifest path/to/Ru
 ### Running Tests
 
 ```bash
-# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (275 tests: 239 prior + 22 Phase 4 + 14 Phase 4.1 fix)
+# Run all Phase 1 + 1.5 + 2A + 2B + 3 + 4 tests (286 tests: 271 prior + 15 Phase 4.1 fix)
 PYTHONPATH=src pytest tests/test_artifacts.py tests/test_brief_generator.py tests/test_contract_validator.py tests/test_demo_contract.py tests/test_upstream_artifacts.py tests/test_fixture_integration.py tests/test_phase2b_handoff.py tests/test_phase3_integration.py tests/test_phase4_artifact_transport.py -v --no-cov
 
 # Run Phase 4 artifact-transport tests only (includes nested layout resolution tests)

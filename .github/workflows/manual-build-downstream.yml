@@ -101,6 +101,7 @@ jobs:
           CANDIDATES=""
           CANDIDATE_COUNT=0
           for child in "${ARTIFACT_DIR}"/*/; do
+            [ -d "${child}" ] || continue
             if [ -f "${child}handoff_manifest.json" ]; then
               CANDIDATES="${child%/}"
               CANDIDATE_COUNT=$((CANDIDATE_COUNT + 1))

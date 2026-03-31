@@ -435,3 +435,18 @@ class TestNestedLayoutPythonLoading:
             result["brief"].model_dump(), CONTRACT_PATH
         )
         assert is_valid, f"ResearchBrief contract errors: {errors}"
+
+    def test_outer_dir_without_manifest_falls_back(self, tmp_path):
+        """Loading from the outer directory (no handoff_manifest.json at root)
+        should fall back to auto-discovery, which finds nothing since the
+        artifacts are in the nested subdirectory."""
+        outer = tmp_path / "upstream-handoff"
+        nested = outer / "jwst-upstream-handoff"
+        _copy_upstream_to(nested)
+        # The outer dir has no handoff_manifest.json and no well-known filenames
+        fixtures = load_from_handoff_manifest(str(outer))
+        # Auto-discovery won't find artifacts because they're inside a subdir
+        # that doesn't match the well-known filenames
+        assert fixtures.graph is None
+        assert fixtures.documents is None
+        assert fixtures.handoff_source_run_id is None
