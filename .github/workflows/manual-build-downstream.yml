@@ -2,6 +2,7 @@ name: Build Downstream Handoff
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -11,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        repository: siddhant61/content-research-pipeline
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v3

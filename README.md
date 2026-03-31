@@ -95,16 +95,35 @@ PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
     --run-manifest integration_fixtures/jwst/downstream/RunManifest.json
 ```
 
-### GitHub Actions — Manual Downstream Handoff Build
+### GitHub Actions — Downstream Handoff Build
 
-The **Build Downstream Handoff** workflow (`manual-build-downstream.yml`) regenerates the canonical downstream handoff package from the upstream fixtures checked into the repo.
+The **Build Downstream Handoff** workflow (`.github/workflows/manual-build-downstream.yml`) regenerates the canonical downstream handoff package from the upstream fixtures checked into the repo.
 
-**How to run:**
+**Trigger modes:**
+
+| Mode | Trigger | Use case |
+|------|---------|----------|
+| Manual | `workflow_dispatch` | Run from the **Actions** tab in GitHub |
+| Reusable | `workflow_call` | Called by an orchestration repo (e.g. `pipeline-integration`) |
+
+**How to run manually:**
 1. Go to the **Actions** tab in GitHub.
 2. Select the **Build Downstream Handoff** workflow from the left sidebar.
 3. Click **Run workflow** and confirm.
 
-The workflow generates a fresh `ResearchBrief`, `RunManifest`, and `handoff_manifest.json` from `integration_fixtures/jwst/upstream/`, validates each artifact against the shared contract, and uploads the complete `integration_fixtures/jwst/downstream/` directory as a workflow artifact named **`jwst-downstream-handoff`**.
+**How to call as a reusable workflow:**
+```yaml
+jobs:
+  research:
+    uses: siddhant61/content-research-pipeline/.github/workflows/manual-build-downstream.yml@main
+```
+
+**Artifact output:**
+- **Artifact name:** `jwst-downstream-handoff`
+- **Output directory:** `integration_fixtures/jwst/downstream/`
+- **Contents:** `ResearchBrief.json`, `RunManifest.json`, `handoff_manifest.json`
+
+The workflow generates a fresh `ResearchBrief`, `RunManifest`, and `handoff_manifest.json` from `integration_fixtures/jwst/upstream/`, validates each artifact against the shared contract, and uploads the complete downstream directory as the workflow artifact.
 
 ## Phase 2B — Full Upstream Handoff Integration
 
