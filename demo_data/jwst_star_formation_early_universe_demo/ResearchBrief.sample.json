@@ -1,18 +1,216 @@
 {
   "artifact_type": "ResearchBrief",
   "schema_version": "1.0.0",
-  "artifact_id": "sample-research-brief",
-  "created_at": "2026-03-30T00:00:00Z",
-  "producer": "starter-pack",
-  "source_run_id": "bootstrap",
-  "topic": "jwst_star_formation_early_universe_demo",
-  "research_question": "How does JWST help us understand star formation and the early universe?",
-  "executive_summary": "",
-  "key_findings": [],
-  "entities": [],
+  "artifact_id": "jwst-demo-research-brief-001",
+  "created_at": "2026-03-31T00:00:00Z",
+  "producer": "content-research-pipeline",
+  "source_run_id": "research-run-001",
+  "topic": "James Webb Space Telescope: telescope architecture, star formation, and the early universe",
+  "research_question": "What are the key aspects of: James Webb Space Telescope: telescope architecture, star formation, and the early universe?",
+  "executive_summary": "This research brief covers 'James Webb Space Telescope: telescope architecture, star formation, and the early universe' based on 6 curated source(s). Key entities include James Webb Space Telescope, infrared astronomy, star formation, early universe, sunshield. The brief synthesizes available information to address: What are the key aspects of: James Webb Space Telescope: telescope architecture, star formation, and the early universe?",
+  "key_findings": [
+    {
+      "finding_id": "find-jwst-demo-001",
+      "claim": "James Webb Space Telescope operates_in infrared astronomy",
+      "importance": "high",
+      "confidence": 0.95,
+      "evidence_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "finding_id": "find-jwst-demo-002",
+      "claim": "James Webb Space Telescope studies star formation",
+      "importance": "high",
+      "confidence": 0.9,
+      "evidence_refs": ["jwst-nasa-video-star-formation"]
+    },
+    {
+      "finding_id": "find-jwst-demo-003",
+      "claim": "James Webb Space Telescope studies early universe",
+      "importance": "high",
+      "confidence": 0.9,
+      "evidence_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "finding_id": "find-jwst-demo-004",
+      "claim": "James Webb Space Telescope has_component sunshield",
+      "importance": "high",
+      "confidence": 0.95,
+      "evidence_refs": ["jwst-nasa-fact-sheet"]
+    },
+    {
+      "finding_id": "find-jwst-demo-005",
+      "claim": "James Webb Space Telescope: A large infrared space telescope launched in 2021 to observe the universe in infrared wavelengths",
+      "importance": "medium",
+      "confidence": 0.7,
+      "evidence_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "finding_id": "find-jwst-demo-006",
+      "claim": "infrared astronomy: Branch of astronomy that studies celestial objects in infrared radiation",
+      "importance": "medium",
+      "confidence": 0.7,
+      "evidence_refs": ["jwst-nasa-fact-sheet"]
+    },
+    {
+      "finding_id": "find-jwst-demo-007",
+      "claim": "star formation: The process by which dense regions within molecular clouds collapse to form stars",
+      "importance": "medium",
+      "confidence": 0.7,
+      "evidence_refs": ["jwst-nasa-video-star-formation"]
+    },
+    {
+      "finding_id": "find-jwst-demo-008",
+      "claim": "early universe: The period of the universe from the Big Bang to the formation of the first galaxies",
+      "importance": "medium",
+      "confidence": 0.7,
+      "evidence_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "finding_id": "find-jwst-demo-009",
+      "claim": "sunshield: A five-layer tennis-court-sized shield that protects the telescope from the Sun's heat",
+      "importance": "medium",
+      "confidence": 0.7,
+      "evidence_refs": ["jwst-nasa-fact-sheet"]
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "n-jwst",
+      "label": "James Webb Space Telescope",
+      "entity_type": "telescope",
+      "description": "A large infrared space telescope launched in 2021 to observe the universe in infrared wavelengths",
+      "aliases": ["JWST", "Webb"],
+      "source_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "entity_id": "n-infrared",
+      "label": "infrared astronomy",
+      "entity_type": "field",
+      "description": "Branch of astronomy that studies celestial objects in infrared radiation",
+      "aliases": ["IR astronomy"],
+      "source_refs": ["jwst-nasa-fact-sheet"]
+    },
+    {
+      "entity_id": "n-star-formation",
+      "label": "star formation",
+      "entity_type": "process",
+      "description": "The process by which dense regions within molecular clouds collapse to form stars",
+      "aliases": ["stellar birth"],
+      "source_refs": ["jwst-nasa-video-star-formation"]
+    },
+    {
+      "entity_id": "n-early-universe",
+      "label": "early universe",
+      "entity_type": "concept",
+      "description": "The period of the universe from the Big Bang to the formation of the first galaxies",
+      "aliases": ["cosmic dawn"],
+      "source_refs": ["jwst-nasa-mission-overview"]
+    },
+    {
+      "entity_id": "n-sunshield",
+      "label": "sunshield",
+      "entity_type": "component",
+      "description": "A five-layer tennis-court-sized shield that protects the telescope from the Sun's heat",
+      "aliases": ["sun shield"],
+      "source_refs": ["jwst-nasa-fact-sheet"]
+    }
+  ],
   "timeline": [],
-  "source_index": [],
-  "citation_map": {},
-  "open_questions": [],
-  "recommended_angles": []
+  "source_index": [
+    {
+      "source_id": "jwst-nasa-mission-overview",
+      "title": "NASA Webb Mission Overview",
+      "origin_org": "NASA",
+      "url": "https://science.nasa.gov/mission/webb/",
+      "source_type": "webpage",
+      "credibility_notes": "Primary mission overview and authoritative framing source"
+    },
+    {
+      "source_id": "jwst-nasa-fact-sheet",
+      "title": "NASA Webb Fact Sheet",
+      "origin_org": "NASA",
+      "url": "https://science.nasa.gov/mission/webb/fact-sheet/",
+      "source_type": "webpage",
+      "credibility_notes": "Structured technical background for ingestion and graph seeding"
+    },
+    {
+      "source_id": "jwst-nasa-about-infographic",
+      "title": "About the James Webb Space Telescope",
+      "origin_org": "NASA",
+      "url": "https://science.nasa.gov/asset/webb/about-the-james-webb-space-telescope/",
+      "source_type": "webpage",
+      "credibility_notes": "Diagram/infographic reference for component and system structure"
+    },
+    {
+      "source_id": "jwst-nasa-gallery",
+      "title": "NASA James Webb Space Telescope Gallery",
+      "origin_org": "NASA",
+      "url": "https://www.nasa.gov/gallery/james-webb-space-telescope/",
+      "source_type": "webpage",
+      "credibility_notes": "Visual asset index for media pipeline and provenance links"
+    },
+    {
+      "source_id": "jwst-nasa-video-star-formation",
+      "title": "Webb: Transforming Our Understanding of Star Formation",
+      "origin_org": "NASA",
+      "url": "https://science.nasa.gov/asset/webb/webb-transforming-our-understanding-of-star-formation/",
+      "source_type": "video",
+      "credibility_notes": "Reference page expected to expose downloadable video, captions, and transcript"
+    },
+    {
+      "source_id": "jwst-esa-brochure",
+      "title": "ESA Webb Ready-to-use Material",
+      "origin_org": "ESA",
+      "url": "https://www.esa.int/About_Us/Exhibitions/Ready-to-use_material/Webb",
+      "source_type": "pdf",
+      "credibility_notes": "Outreach brochure / printable material for supplemental ingestion"
+    }
+  ],
+  "citation_map": {
+    "jwst-nasa-mission-overview": {
+      "title": "NASA Webb Mission Overview",
+      "url": "https://science.nasa.gov/mission/webb/",
+      "origin_org": "NASA",
+      "license": "See NASA media usage guidelines; exclude third-party-marked items"
+    },
+    "jwst-nasa-fact-sheet": {
+      "title": "NASA Webb Fact Sheet",
+      "url": "https://science.nasa.gov/mission/webb/fact-sheet/",
+      "origin_org": "NASA",
+      "license": "See NASA media usage guidelines"
+    },
+    "jwst-nasa-about-infographic": {
+      "title": "About the James Webb Space Telescope",
+      "url": "https://science.nasa.gov/asset/webb/about-the-james-webb-space-telescope/",
+      "origin_org": "NASA",
+      "license": "See NASA media usage guidelines"
+    },
+    "jwst-nasa-gallery": {
+      "title": "NASA James Webb Space Telescope Gallery",
+      "url": "https://www.nasa.gov/gallery/james-webb-space-telescope/",
+      "origin_org": "NASA",
+      "license": "See NASA media usage guidelines; exclude third-party-marked items"
+    },
+    "jwst-nasa-video-star-formation": {
+      "title": "Webb: Transforming Our Understanding of Star Formation",
+      "url": "https://science.nasa.gov/asset/webb/webb-transforming-our-understanding-of-star-formation/",
+      "origin_org": "NASA",
+      "license": "See NASA media usage guidelines"
+    },
+    "jwst-esa-brochure": {
+      "title": "ESA Webb Ready-to-use Material",
+      "url": "https://www.esa.int/About_Us/Exhibitions/Ready-to-use_material/Webb",
+      "origin_org": "ESA",
+      "license": "Check ESA page for asset-specific usage terms"
+    }
+  },
+  "open_questions": [
+    "What additional sources are needed to deepen coverage of James Webb Space Telescope: telescope architecture, star formation, and the early universe?",
+    "Are there recent developments not yet captured in the source bundle?"
+  ],
+  "recommended_angles": [
+    "Deep dive into James Webb Space Telescope",
+    "Source credibility comparison across organizations",
+    "Timeline of key milestones and discoveries"
+  ]
 }

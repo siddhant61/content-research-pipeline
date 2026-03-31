@@ -18,7 +18,10 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .fixture_loader import UpstreamFixtures
 
 from ..data.artifacts import (
     ChunkSet,
@@ -611,6 +614,9 @@ class BriefGenerator:
         if self.documents:
             upstream_provenance["documents_producer"] = self.documents.producer
             upstream_provenance["documents_source_run_id"] = self.documents.source_run_id
+        if self.chunks:
+            upstream_provenance["chunks_producer"] = self.chunks.producer
+            upstream_provenance["chunks_source_run_id"] = self.chunks.source_run_id
         if self.bundle:
             upstream_provenance["bundle_producer"] = self.bundle.producer
             upstream_provenance["bundle_source_run_id"] = self.bundle.source_run_id
@@ -804,4 +810,73 @@ def generate_brief_from_artifacts(
         "run_manifest": run_manifest_out,
         "brief_path": str(brief_path),
         "manifest_path": str(manifest_path_out),
+    }
+
+
+def generate_brief_from_fixtures(
+    fixtures: "UpstreamFixtures",
+    research_question: Optional[str] = None,
+    output_dir: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    End-to-end convenience function: generate a ResearchBrief from a loaded
+    ``UpstreamFixtures`` container produced by ``load_upstream_fixtures()``.
+
+    This is the Phase 2B preferred entry-point when consuming a full upstream
+    handoff package from material-ingestion-pipeline.  It avoids re-loading
+    artifacts that have already been discovered and parsed.
+
+    Args:
+        fixtures: An ``UpstreamFixtures`` instance (from ``load_upstream_fixtures()``).
+        research_question: Optional override for the research question.
+        output_dir: Directory to write output files.  Defaults to current directory.
+
+    Returns:
+        Dict with keys 'brief', 'run_manifest', 'brief_path', 'manifest_path',
+        and 'fixtures'.
+
+    Raises:
+        ValueError: If *fixtures* contains no loaded artifacts.
+    """
+    if not fixtures.has_any:
+        raise ValueError(
+            "UpstreamFixtures contains no loaded artifacts — cannot generate a ResearchBrief."
+        )
+
+    generator = BriefGenerator(
+        bundle=fixtures.bundle,
+        documents=fixtures.documents,
+        chunks=fixtures.chunks,
+        graph=fixtures.graph,
+    )
+
+    brief = generator.generate(research_question=research_question)
+
+    # Determine output paths
+    out = Path(output_dir) if output_dir else Path(".")
+    out.mkdir(parents=True, exist_ok=True)
+
+    topic_slug = _resolve_topic_slug(fixtures.bundle, fixtures.documents, fixtures.graph)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+
+    brief_filename = f"{topic_slug}__ResearchBrief__{ts}.json"
+    manifest_filename = f"{topic_slug}__RunManifest__{ts}.json"
+
+    brief_path = out / brief_filename
+    manifest_path_out = out / manifest_filename
+
+    brief_path.write_text(
+        brief.model_dump_json(indent=2), encoding="utf-8"
+    )
+    run_manifest_out = generator.generate_run_manifest(brief, str(brief_path))
+    manifest_path_out.write_text(
+        run_manifest_out.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    return {
+        "brief": brief,
+        "run_manifest": run_manifest_out,
+        "brief_path": str(brief_path),
+        "manifest_path": str(manifest_path_out),
+        "fixtures": fixtures,
     }

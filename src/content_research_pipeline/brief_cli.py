@@ -89,7 +89,7 @@ def brief_cli():
     type=click.Path(exists=True, file_okay=False),
     help="Path to a fixture directory containing upstream artifacts. "
          "Auto-discovers KnowledgeGraphPackage, NormalizedDocumentSet, "
-         "and RawSourceBundle from well-known filenames.",
+         "ChunkSet, and RawSourceBundle from well-known filenames.",
 )
 @click.option(
     "--output-dir", "-o",
@@ -126,6 +126,9 @@ def generate(manifest, question, documents, chunks, graph, fixture_dir, output_d
         if fixtures.documents_path:
             documents = documents or fixtures.documents_path
             click.echo(f"  NormalizedDocumentSet: {fixtures.documents_path}")
+        if fixtures.chunks_path:
+            chunks = chunks or fixtures.chunks_path
+            click.echo(f"  ChunkSet:              {fixtures.chunks_path}")
         if fixtures.bundle_path:
             manifest = manifest or fixtures.bundle_path
             click.echo(f"  RawSourceBundle:       {fixtures.bundle_path}")
@@ -145,6 +148,8 @@ def generate(manifest, question, documents, chunks, graph, fixture_dir, output_d
         inputs.append(f"manifest: {manifest}")
     if documents:
         inputs.append(f"documents: {documents}")
+    if chunks:
+        inputs.append(f"chunks: {chunks}")
     if graph:
         inputs.append(f"graph: {graph}")
     click.echo(f"Loading inputs: {', '.join(inputs)}")
