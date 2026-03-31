@@ -134,11 +134,7 @@ jobs:
           echo "mode=artifact" >> "$GITHUB_OUTPUT"
           echo "upstream_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
           echo "::notice ::Using downloaded upstream artifact '${RESOLVED_DIR}'"
-          python -c "
-        import json, pathlib
-        m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text())
-        print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
-        "
+          python -c "import json, pathlib; m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text()); print('Upstream source_run_id:', m.get('source_run_id', 'unknown'))"
 
           echo "--- Resolved directory tree ---"
           ls -R "${RESOLVED_DIR}"
@@ -146,15 +142,7 @@ jobs:
           # ── Extract upstream source_run_id from handoff_manifest ───
           UPSTREAM_RUN_ID=""
           if [ -f "${RESOLVED_DIR}/handoff_manifest.json" ]; then
-            UPSTREAM_RUN_ID=$(python -c "
-          import json, pathlib, sys
-          try:
-              m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text())
-              print(m.get('source_run_id', ''))
-          except Exception as e:
-              print(f'Warning: failed to parse handoff_manifest.json: {e}', file=sys.stderr)
-              print('')
-          ")
+            UPSTREAM_RUN_ID=$(python -c "import json, pathlib; m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text()); print(m.get('source_run_id', ''))" 2>/dev/null || echo "")
           fi
 
           # ── Debug: show explicit artifact files being used ─────────
