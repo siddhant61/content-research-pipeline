@@ -263,13 +263,13 @@ class TestWorkflowYAMLStructure:
         assert "inputs.upstream_artifact_name" in self.workflow_text
 
     def test_resolve_upstream_step_present(self):
-        assert "resolve-upstream" in self.workflow_text
+        assert "resolve_upstream" in self.workflow_text
 
     def test_fixture_fallback_path_in_resolve(self):
         assert "integration_fixtures/jwst/upstream/" in self.workflow_text
 
     def test_upstream_dir_output_used_in_generate(self):
-        assert "steps.resolve-upstream.outputs.upstream_dir" in self.workflow_text
+        assert "steps.resolve_upstream.outputs.upstream_dir" in self.workflow_text
 
     def test_upload_artifact_step_present(self):
         assert "actions/upload-artifact@v4" in self.workflow_text
@@ -308,9 +308,10 @@ class TestWorkflowDiagnosticHardening:
         """The download step must have an id to reference its outcome."""
         assert "id: download-artifact" in self.workflow_text
 
-    def test_verify_step_present(self):
-        """A verification step must exist after artifact download."""
-        assert "Verify artifact download" in self.workflow_text
+    def test_resolve_step_verifies_download(self):
+        """The resolve step must verify the download outcome."""
+        assert "Verify artifact download" in self.workflow_text or \
+            "steps.download-artifact.outcome" in self.workflow_text
 
     def test_verify_step_checks_outcome(self):
         """The verification step must check the download step outcome."""
@@ -360,9 +361,9 @@ class TestNestedArtifactDirectoryResolution:
         """The post-download debug step must print the upstream_artifact_name."""
         assert "upstream_artifact_name:" in self.workflow_text
 
-    def test_verify_step_has_id(self):
-        """The verify step must have an id to set outputs."""
-        assert "id: verify-artifact" in self.workflow_text
+    def test_resolve_step_has_id(self):
+        """The resolve step must have an id to set outputs."""
+        assert "id: resolve_upstream" in self.workflow_text
 
     def test_verify_checks_root_first(self):
         """Verify step must first check for handoff_manifest.json at root."""
@@ -372,13 +373,13 @@ class TestNestedArtifactDirectoryResolution:
         """Verify step must check for handoff_manifest.json in child directories."""
         assert "nested subdirectory layout" in self.workflow_text
 
-    def test_verify_sets_resolved_artifact_dir_output(self):
-        """Verify step must set resolved_artifact_dir as a step output."""
-        assert "resolved_artifact_dir=" in self.workflow_text
+    def test_resolve_sets_upstream_dir_output(self):
+        """Resolve step must set upstream_dir as a step output."""
+        assert "upstream_dir=" in self.workflow_text
 
-    def test_resolve_uses_verified_dir(self):
-        """Resolve step must reference the verified artifact directory output."""
-        assert "steps.verify-artifact.outputs.resolved_artifact_dir" in self.workflow_text
+    def test_generate_uses_resolve_upstream_output(self):
+        """Generate step must reference the resolve_upstream step output."""
+        assert "steps.resolve_upstream.outputs.upstream_dir" in self.workflow_text
 
     def test_error_includes_directory_tree(self):
         """Error paths must include 'Directory tree:' for debugging."""
