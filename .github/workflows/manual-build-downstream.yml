@@ -62,87 +62,84 @@ jobs:
 
     # ── Debug: inspect downloaded artifact layout ──────────────────
     - name: Debug downloaded artifact layout
-      if: inputs.upstream_artifact_name != '' && steps.download-artifact.outcome == 'success'
+      if: inputs.upstream_artifact_name != ''
       run: |
         echo "::group::Downloaded Artifact Layout"
         echo "upstream_artifact_name: '${{ inputs.upstream_artifact_name }}'"
+        echo "Download step outcome: '${{ steps.download-artifact.outcome }}'"
         echo "Download directory: /tmp/upstream-handoff"
         echo "--- ls -R /tmp/upstream-handoff ---"
         ls -R /tmp/upstream-handoff || echo "(directory does not exist)"
         echo "::endgroup::"
 
-    # ── Verify artifact download result ─────────────────────────────
-    - name: Verify artifact download
-      id: verify-artifact
-      if: inputs.upstream_artifact_name != ''
-      run: |
-        echo "::group::Artifact Download Verification"
-        echo "Requested artifact name: '${{ inputs.upstream_artifact_name }}'"
-        echo "Download step outcome: '${{ steps.download-artifact.outcome }}'"
-        echo "Download target directory: /tmp/upstream-handoff"
-        if [ "${{ steps.download-artifact.outcome }}" != "success" ]; then
-          echo "::error ::Artifact download FAILED for '${{ inputs.upstream_artifact_name }}'. The upstream job may not have produced this artifact, or the artifact name may be misspelled."
-          exit 1
-        fi
-        if [ ! -d "/tmp/upstream-handoff" ]; then
-          echo "::error ::Download directory /tmp/upstream-handoff does not exist despite successful download step."
-          exit 1
-        fi
-        ARTIFACT_DIR="/tmp/upstream-handoff"
-        RESOLVED_DIR=""
-        # Check 1: handoff_manifest.json directly in download root
-        if [ -f "${ARTIFACT_DIR}/handoff_manifest.json" ]; then
-          echo "✓ handoff_manifest.json found directly in ${ARTIFACT_DIR}"
-          RESOLVED_DIR="${ARTIFACT_DIR}"
-        else
-          echo "handoff_manifest.json not found directly in ${ARTIFACT_DIR}"
-          echo "Checking for nested subdirectory layout..."
-          # Check 2: exactly one child directory containing handoff_manifest.json
-          CANDIDATES=""
-          CANDIDATE_COUNT=0
-          for child in "${ARTIFACT_DIR}"/*/; do
-            [ -d "${child}" ] || continue
-            if [ -f "${child}handoff_manifest.json" ]; then
-              CANDIDATES="${child%/}"
-              CANDIDATE_COUNT=$((CANDIDATE_COUNT + 1))
-            fi
-          done
-          if [ "${CANDIDATE_COUNT}" -eq 1 ]; then
-            RESOLVED_DIR="${CANDIDATES}"
-            echo "✓ handoff_manifest.json found in nested directory: ${RESOLVED_DIR}"
-          elif [ "${CANDIDATE_COUNT}" -gt 1 ]; then
-            echo "::error ::Multiple nested directories contain handoff_manifest.json. Cannot resolve unique handoff package."
-            echo "Directory tree:"
-            ls -R "${ARTIFACT_DIR}"
-            exit 1
-          else
-            echo "::error ::handoff_manifest.json NOT found in downloaded artifact '${{ inputs.upstream_artifact_name }}' (checked root and all child directories)."
-            echo "Directory tree:"
-            ls -R "${ARTIFACT_DIR}"
-            exit 1
-          fi
-        fi
-        echo "resolved_artifact_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
-        echo "::endgroup::"
-
-    # ── Resolve which upstream directory to use ─────────────────────
+    # ── Resolve upstream handoff directory ────────────────────────────
     - name: Resolve upstream handoff directory
-      id: resolve-upstream
+      id: resolve_upstream
       run: |
+        ARTIFACT_DIR="/tmp/upstream-handoff"
         FIXTURE_DIR="integration_fixtures/jwst/upstream/"
         echo "Fallback fixture path: ${FIXTURE_DIR}"
-        if [ -n "${{ inputs.upstream_artifact_name }}" ] \
-           && [ -n "${{ steps.verify-artifact.outputs.resolved_artifact_dir }}" ]; then
-          RESOLVED="${{ steps.verify-artifact.outputs.resolved_artifact_dir }}"
-          echo "Artifact download path: ${RESOLVED}"
-          echo "upstream_dir=${RESOLVED}" >> "$GITHUB_OUTPUT"
+
+        # ── Artifact mode ──────────────────────────────────────────
+        if [ -n "${{ inputs.upstream_artifact_name }}" ]; then
+          echo "Artifact download path: ${ARTIFACT_DIR}"
+          echo "Download step outcome: '${{ steps.download-artifact.outcome }}'"
+
+          # Verify artifact download succeeded
+          if [ "${{ steps.download-artifact.outcome }}" != "success" ]; then
+            echo "::error ::Artifact download FAILED for '${{ inputs.upstream_artifact_name }}'. The upstream job may not have produced this artifact, or the artifact name may be misspelled."
+            exit 1
+          fi
+          if [ ! -d "${ARTIFACT_DIR}" ]; then
+            echo "::error ::Download directory ${ARTIFACT_DIR} does not exist despite successful download step."
+            exit 1
+          fi
+
+          RESOLVED_DIR=""
+
+          # Check 1: handoff_manifest.json directly in download root
+          if [ -f "${ARTIFACT_DIR}/handoff_manifest.json" ]; then
+            echo "✓ handoff_manifest.json found directly in ${ARTIFACT_DIR}"
+            RESOLVED_DIR="${ARTIFACT_DIR}"
+          else
+            echo "handoff_manifest.json not found directly in ${ARTIFACT_DIR}"
+            echo "Checking for nested subdirectory layout..."
+            # Check 2: exactly one child directory containing handoff_manifest.json
+            CANDIDATES=""
+            CANDIDATE_COUNT=0
+            for child in "${ARTIFACT_DIR}"/*/; do
+              [ -d "${child}" ] || continue
+              if [ -f "${child}handoff_manifest.json" ]; then
+                CANDIDATES="${child%/}"
+                CANDIDATE_COUNT=$((CANDIDATE_COUNT + 1))
+              fi
+            done
+            if [ "${CANDIDATE_COUNT}" -eq 1 ]; then
+              RESOLVED_DIR="${CANDIDATES}"
+              echo "✓ handoff_manifest.json found in nested directory: ${RESOLVED_DIR}"
+            elif [ "${CANDIDATE_COUNT}" -gt 1 ]; then
+              echo "::error ::Multiple nested directories contain handoff_manifest.json. Cannot resolve unique handoff package."
+              echo "Directory tree:"
+              ls -R "${ARTIFACT_DIR}"
+              exit 1
+            else
+              echo "::error ::handoff_manifest.json NOT found in downloaded artifact '${{ inputs.upstream_artifact_name }}' (checked root and all child directories)."
+              echo "Directory tree:"
+              ls -R "${ARTIFACT_DIR}"
+              exit 1
+            fi
+          fi
+
+          echo "upstream_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=artifact" >> "$GITHUB_OUTPUT"
-          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}' from ${RESOLVED}"
+          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}' from ${RESOLVED_DIR}"
           python -c "
         import json, pathlib
-        m = json.loads(pathlib.Path('${RESOLVED}/handoff_manifest.json').read_text())
+        m = json.loads(pathlib.Path('${RESOLVED_DIR}/handoff_manifest.json').read_text())
         print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
         "
+
+        # ── Fixture fallback mode ──────────────────────────────────
         else
           echo "Artifact download path: (none)"
           echo "upstream_dir=${FIXTURE_DIR}" >> "$GITHUB_OUTPUT"
@@ -154,7 +151,7 @@ jobs:
       run: |
         rm -rf integration_fixtures/jwst/downstream/*
         PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
-            --upstream-handoff-dir "${{ steps.resolve-upstream.outputs.upstream_dir }}" \
+            --upstream-handoff-dir "${{ steps.resolve_upstream.outputs.upstream_dir }}" \
             --output-dir integration_fixtures/jwst/downstream/ \
             --emit-handoff-manifest
 
@@ -170,8 +167,8 @@ jobs:
     - name: Report handoff mode
       run: |
         echo "## Downstream Handoff Build" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Mode:** ${{ steps.resolve-upstream.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Upstream dir:** ${{ steps.resolve-upstream.outputs.upstream_dir }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Mode:** ${{ steps.resolve_upstream.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Upstream dir:** ${{ steps.resolve_upstream.outputs.upstream_dir }}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload downstream handoff artifact
       uses: actions/upload-artifact@v4
