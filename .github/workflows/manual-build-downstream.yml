@@ -60,8 +60,20 @@ jobs:
         name: ${{ inputs.upstream_artifact_name }}
         path: /tmp/upstream-handoff
 
+    # ── Debug: inspect downloaded artifact layout ──────────────────
+    - name: Debug downloaded artifact layout
+      if: inputs.upstream_artifact_name != '' && steps.download-artifact.outcome == 'success'
+      run: |
+        echo "::group::Downloaded Artifact Layout"
+        echo "upstream_artifact_name: '${{ inputs.upstream_artifact_name }}'"
+        echo "Download directory: /tmp/upstream-handoff"
+        echo "--- ls -R /tmp/upstream-handoff ---"
+        ls -R /tmp/upstream-handoff || echo "(directory does not exist)"
+        echo "::endgroup::"
+
     # ── Verify artifact download result ─────────────────────────────
     - name: Verify artifact download
+      id: verify-artifact
       if: inputs.upstream_artifact_name != ''
       run: |
         echo "::group::Artifact Download Verification"
@@ -76,36 +88,62 @@ jobs:
           echo "::error ::Download directory /tmp/upstream-handoff does not exist despite successful download step."
           exit 1
         fi
-        echo "Contents of /tmp/upstream-handoff:"
-        ls -la /tmp/upstream-handoff/
-        if [ -f "/tmp/upstream-handoff/handoff_manifest.json" ]; then
-          echo "✓ handoff_manifest.json found"
+        ARTIFACT_DIR="/tmp/upstream-handoff"
+        RESOLVED_DIR=""
+        # Check 1: handoff_manifest.json directly in download root
+        if [ -f "${ARTIFACT_DIR}/handoff_manifest.json" ]; then
+          echo "✓ handoff_manifest.json found directly in ${ARTIFACT_DIR}"
+          RESOLVED_DIR="${ARTIFACT_DIR}"
         else
-          echo "::error ::handoff_manifest.json NOT found in downloaded artifact. The upstream artifact '${{ inputs.upstream_artifact_name }}' may be incomplete or malformed."
-          exit 1
+          echo "handoff_manifest.json not found directly in ${ARTIFACT_DIR}"
+          echo "Checking for nested subdirectory layout..."
+          # Check 2: exactly one child directory containing handoff_manifest.json
+          CANDIDATES=""
+          CANDIDATE_COUNT=0
+          for child in "${ARTIFACT_DIR}"/*/; do
+            if [ -f "${child}handoff_manifest.json" ]; then
+              CANDIDATES="${child%/}"
+              CANDIDATE_COUNT=$((CANDIDATE_COUNT + 1))
+            fi
+          done
+          if [ "${CANDIDATE_COUNT}" -eq 1 ]; then
+            RESOLVED_DIR="${CANDIDATES}"
+            echo "✓ handoff_manifest.json found in nested directory: ${RESOLVED_DIR}"
+          elif [ "${CANDIDATE_COUNT}" -gt 1 ]; then
+            echo "::error ::Multiple nested directories contain handoff_manifest.json. Cannot resolve unique handoff package."
+            echo "Directory tree:"
+            ls -R "${ARTIFACT_DIR}"
+            exit 1
+          else
+            echo "::error ::handoff_manifest.json NOT found in downloaded artifact '${{ inputs.upstream_artifact_name }}' (checked root and all child directories)."
+            echo "Directory tree:"
+            ls -R "${ARTIFACT_DIR}"
+            exit 1
+          fi
         fi
+        echo "resolved_artifact_dir=${RESOLVED_DIR}" >> "$GITHUB_OUTPUT"
         echo "::endgroup::"
 
     # ── Resolve which upstream directory to use ─────────────────────
     - name: Resolve upstream handoff directory
       id: resolve-upstream
       run: |
-        ARTIFACT_DIR="/tmp/upstream-handoff"
         FIXTURE_DIR="integration_fixtures/jwst/upstream/"
-        echo "Artifact download path: ${ARTIFACT_DIR}"
         echo "Fallback fixture path: ${FIXTURE_DIR}"
         if [ -n "${{ inputs.upstream_artifact_name }}" ] \
-           && [ -d "${ARTIFACT_DIR}" ] \
-           && [ -f "${ARTIFACT_DIR}/handoff_manifest.json" ]; then
-          echo "upstream_dir=${ARTIFACT_DIR}" >> "$GITHUB_OUTPUT"
+           && [ -n "${{ steps.verify-artifact.outputs.resolved_artifact_dir }}" ]; then
+          RESOLVED="${{ steps.verify-artifact.outputs.resolved_artifact_dir }}"
+          echo "Artifact download path: ${RESOLVED}"
+          echo "upstream_dir=${RESOLVED}" >> "$GITHUB_OUTPUT"
           echo "mode=artifact" >> "$GITHUB_OUTPUT"
-          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}'"
+          echo "::notice ::Using downloaded upstream artifact '${{ inputs.upstream_artifact_name }}' from ${RESOLVED}"
           python -c "
         import json, pathlib
-        m = json.loads(pathlib.Path('${ARTIFACT_DIR}/handoff_manifest.json').read_text())
+        m = json.loads(pathlib.Path('${RESOLVED}/handoff_manifest.json').read_text())
         print(f'Upstream source_run_id: {m.get(\"source_run_id\", \"unknown\")}')
         "
         else
+          echo "Artifact download path: (none)"
           echo "upstream_dir=${FIXTURE_DIR}" >> "$GITHUB_OUTPUT"
           echo "mode=fixture" >> "$GITHUB_OUTPUT"
           echo "::notice ::Using committed local fixtures (${FIXTURE_DIR})"
