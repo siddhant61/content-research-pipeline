@@ -4,7 +4,7 @@ Stable upstream fixture loader for the Content Research Pipeline.
 Discovers and loads canonical upstream ingestion artifacts from a fixture
 directory (e.g. ``demo_data/jwst_star_formation_early_universe_demo/``).
 
-This module provides a single entry-point for Phase 2A fixture-based
+This module provides a single entry-point for Phase 2A/2B fixture-based
 consumption of material-ingestion-pipeline outputs.  It looks for
 well-known filenames produced by that pipeline and returns loaded
 Pydantic models ready for ``BriefGenerator``.
@@ -13,6 +13,7 @@ Well-known filenames
 --------------------
 * ``KnowledgeGraphPackage.sample.json`` — preferred structured input
 * ``NormalizedDocumentSet.sample.json``  — fallback document-level input
+* ``ChunkSet.sample.json``              — chunk-level provenance (optional)
 * ``manifest.json``                      — RawSourceBundle (source metadata)
 
 Contract assumptions
@@ -21,6 +22,8 @@ Contract assumptions
 * ``KnowledgeGraphPackage.provenance`` carries upstream pipeline metadata.
 * ``NormalizedDocumentSet.documents[].source_id`` cross-references
   ``RawSourceBundle.sources[].source_id`` for citation enrichment.
+* ``ChunkSet.chunks[].source_id`` and ``chunk_id`` may be referenced by KG
+  ``SourceRef.chunk_id`` for fine-grained provenance.
 
 Field degradations when KG is consumed without a RawSourceBundle
 ----------------------------------------------------------------
@@ -40,6 +43,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..data.artifacts import (
+    ChunkSet,
     KnowledgeGraphPackage,
     NormalizedDocumentSet,
     RawSourceBundle,
@@ -54,6 +58,10 @@ _KG_FILENAMES = [
 _NDS_FILENAMES = [
     "NormalizedDocumentSet.sample.json",
     "NormalizedDocumentSet.json",
+]
+_CHUNK_FILENAMES = [
+    "ChunkSet.sample.json",
+    "ChunkSet.json",
 ]
 _BUNDLE_FILENAMES = [
     "manifest.json",
@@ -79,25 +87,34 @@ class UpstreamFixtures:
         fixture_dir: Path to the fixture directory that was scanned.
         graph: Loaded KnowledgeGraphPackage, if found.
         documents: Loaded NormalizedDocumentSet, if found.
+        chunks: Loaded ChunkSet, if found.
         bundle: Loaded RawSourceBundle (manifest), if found.
         graph_path: Path to the KG fixture file, if found.
         documents_path: Path to the NDS fixture file, if found.
+        chunks_path: Path to the ChunkSet fixture file, if found.
         bundle_path: Path to the manifest fixture file, if found.
         warnings: Human-readable notes about missing or degraded data.
     """
     fixture_dir: str
     graph: Optional[KnowledgeGraphPackage] = None
     documents: Optional[NormalizedDocumentSet] = None
+    chunks: Optional[ChunkSet] = None
     bundle: Optional[RawSourceBundle] = None
     graph_path: Optional[str] = None
     documents_path: Optional[str] = None
+    chunks_path: Optional[str] = None
     bundle_path: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
 
     @property
     def has_any(self) -> bool:
         """True if at least one upstream artifact was loaded."""
-        return self.graph is not None or self.documents is not None or self.bundle is not None
+        return (
+            self.graph is not None
+            or self.documents is not None
+            or self.chunks is not None
+            or self.bundle is not None
+        )
 
     @property
     def summary(self) -> Dict[str, Any]:
@@ -106,9 +123,11 @@ class UpstreamFixtures:
             "fixture_dir": self.fixture_dir,
             "graph_loaded": self.graph is not None,
             "documents_loaded": self.documents is not None,
+            "chunks_loaded": self.chunks is not None,
             "bundle_loaded": self.bundle is not None,
             "graph_path": self.graph_path,
             "documents_path": self.documents_path,
+            "chunks_path": self.chunks_path,
             "bundle_path": self.bundle_path,
             "warnings": self.warnings,
         }
@@ -158,6 +177,18 @@ def load_upstream_fixtures(fixture_dir: str) -> UpstreamFixtures:
     else:
         result.warnings.append(
             "No NormalizedDocumentSet found — brief will use KG or bundle fallback."
+        )
+
+    # ── ChunkSet ─────────────────────────────────────────────────────
+    chunk_path = _find_first(d, _CHUNK_FILENAMES)
+    if chunk_path:
+        with open(chunk_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        result.chunks = ChunkSet(**data)
+        result.chunks_path = str(chunk_path)
+    else:
+        result.warnings.append(
+            "No ChunkSet found — chunk-level provenance unavailable."
         )
 
     # ── RawSourceBundle (manifest) ───────────────────────────────────
