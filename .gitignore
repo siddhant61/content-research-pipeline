@@ -189,4 +189,5 @@ docker-compose.override.yml
 # Kubernetes
 *.yaml
 *.yml
-!requirements.yml 
+!requirements.yml
+!.github/workflows/*.yml 

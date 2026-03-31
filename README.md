@@ -95,6 +95,17 @@ PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
     --run-manifest integration_fixtures/jwst/downstream/RunManifest.json
 ```
 
+### GitHub Actions — Manual Downstream Handoff Build
+
+The **Build Downstream Handoff** workflow (`manual-build-downstream.yml`) regenerates the canonical downstream handoff package from the upstream fixtures checked into the repo.
+
+**How to run:**
+1. Go to the **Actions** tab in GitHub.
+2. Select the **Build Downstream Handoff** workflow from the left sidebar.
+3. Click **Run workflow** and confirm.
+
+The workflow generates a fresh `ResearchBrief`, `RunManifest`, and `handoff_manifest.json` from `integration_fixtures/jwst/upstream/`, validates each artifact against the shared contract, and uploads the complete `integration_fixtures/jwst/downstream/` directory as a workflow artifact named **`jwst-downstream-handoff`**.
+
 ## Phase 2B — Full Upstream Handoff Integration
 
 Phase 2B completes the upstream consumption path by adding ChunkSet support and

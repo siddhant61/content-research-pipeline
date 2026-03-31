@@ -1,0 +1,46 @@
+name: Build Downstream Handoff
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-downstream:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+
+    - name: Install minimum dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydantic==2.5.0 pydantic-settings==2.1.0 click==8.1.7 loguru==0.7.2
+
+    - name: Generate downstream handoff package
+      run: |
+        rm -rf integration_fixtures/jwst/downstream/*
+        PYTHONPATH=src python -m content_research_pipeline.brief_cli generate \
+            --upstream-handoff-dir integration_fixtures/jwst/upstream/ \
+            --output-dir integration_fixtures/jwst/downstream/ \
+            --emit-handoff-manifest
+
+    - name: Validate outputs
+      run: |
+        BRIEF=$(ls integration_fixtures/jwst/downstream/*ResearchBrief*.json)
+        MANIFEST=$(ls integration_fixtures/jwst/downstream/*RunManifest*.json)
+        PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
+            --brief "$BRIEF"
+        PYTHONPATH=src python -m content_research_pipeline.brief_cli validate \
+            --run-manifest "$MANIFEST"
+
+    - name: Upload downstream handoff artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: jwst-downstream-handoff
+        path: integration_fixtures/jwst/downstream/
